@@ -1,9 +1,10 @@
 # 鸿蒙 NEXT 自定义富文本解析组件（HtmlRichText）
 
-> [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) ![Language](https://img.shields.io/badge/Language-ArkTS-orange.svg) ![Platform](https://img.shields.io/badge/Platform-HarmonyOS%20NEXT-green.svg)
+> [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) ![Language](https://img.shields.io/badge/Language-ArkTS-orange.svg) ![Platform](https://img.shields.io/badge/Platform-HarmonyOS%20NEXT-green.svg) [![Website](https://img.shields.io/badge/Website-htmlrichtext.com-blue)](https://www.htmlrichtext.com/)
 
 > 不依赖 WebView 和系统 RichText 的自研 HTML 富文本组件，专为资讯/文章详情页设计。
 > 手写 HTML 解析器 + ArkUI 原生渲染（Text / Span / Image / Flex / Grid），样式完全可控。
+> 🌐 官方网站：<https://www.htmlrichtext.com/>（文档 / API / 更新日志）
 
 ---
 

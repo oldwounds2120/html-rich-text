@@ -12,6 +12,7 @@
 | ---- | ---- |
 | 项目名称 | harmony-rich-text（包名 `htmlrichtext`） |
 | 仓库地址 | https://github.com/oldwounds2120/harmony-rich-text |
+| 官方网站 | https://www.htmlrichtext.com/（文档 / API / 更新日志） |
 | 开源协议 | Apache-2.0（含 NOTICE 版权声明） |
 | 作者 | Chen Wen（陈文 <oldwounds2120@163.com>） |
 | 定位 | 不依赖 WebView 和系统 RichText 的自研 HTML 富文本组件，专为资讯/文章详情页设计 |
