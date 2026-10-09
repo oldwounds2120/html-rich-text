@@ -14,6 +14,7 @@ import {
 } from './RichTextModels';
 import { RichTextConfig } from './RichTextConfig';
 import { SimpleCodeHighlighter } from './SimpleCodeHighlighter';
+import { countTableCols } from './TableLayout';
 
 const NAMED_COLORS: Map<string, string> = new Map<string, string>([
   ['black', '#000000'], ['white', '#ffffff'], ['red', '#ff0000'], ['green', '#008000'],
@@ -236,11 +237,18 @@ export class RichTextBuilder {
 
   /** 单个行内节点（或裸文本）直接生成一个文本块：用于块级位置的 span/strong/裸文本等 */
   private pushTextBlock(out: RenderBlock[], node: RichNode, style: RichStyle): void {
-    const groups: InlineGroup[] = this.flattenInline([node], style);
+    // 裸文本借用的是父级（块级）样式 → 父级底色不进文字；元素自带底色则保留
+    const isText: boolean = node.type === NodeType.TEXT;
+    const groups: InlineGroup[] = this.flattenInline([node], style, isText);
     if (groups.length === 0) {
       return;
     }
-    out.push(this.makeTextBlock(groups, style));
+    const block: RenderBlock = this.makeTextBlock(groups, style);
+    if (!isText) {
+      // 顶层行内元素（如裸 span）的底色只覆盖文字，已落在 Span 上，块容器不再铺一层
+      block.backgroundColor = undefined;
+    }
+    out.push(block);
   }
 
   /**
@@ -254,10 +262,14 @@ export class RichTextBuilder {
     // 所以先把连续的行内节点累积到 pending，一次性 flattenInline 成单个
     // Text（多 Span），保证整段文字的自然换行；遇到块级子标签（如 <p> 里嵌 <div>）
     // 则先刷出已累积的文本段，再递归处理该块。
+    // 容器自身的底色：既用于自己的文本块，也在"只有块级子元素"时下放给子块
+    const bg: string | undefined = style.backgroundColor;
     const pending: RichNode[] = [];
     const flush = (): void => {
       if (pending.length > 0) {
-        const groups: InlineGroup[] = this.flattenInline(pending, style);
+        // 容器底色不进文本（见 flattenInline 的 stripContainerBackground），
+        // 由 makeTextBlock 挂到块上、组件层整段铺满
+        const groups: InlineGroup[] = this.flattenInline(pending, style, true);
         pending.length = 0;
         if (groups.length > 0) {
           out.push(this.makeTextBlock(groups, style));
@@ -273,7 +285,22 @@ export class RichTextBuilder {
       }
       if (this.isBlockTag(child.tag)) {
         flush();
-        this.processBlock(out, child, style);
+        const before: number = out.length;
+        // 块级子标签必须在此重新算一次样式：容器样式只作为"父级继承来源"，
+        // 子标签自己的内联 style（font-size / color / background-color / margin …）要在这层叠加。
+        // 少了这一步，正文只要被 <div>/<article>/<section> 包一层（后台模板的常见形态），
+        // 里面所有块级元素的内联样式就会整体失效 —— "编辑器里看到的"和"App 里看到的"对不上。
+        this.processBlock(out, child, this.computeStyle(child, style));
+        // 扁平模型下容器本身没有渲染节点，块级子元素各自成块。
+        // 若容器自带底色却只包着块级子元素（如 <div style="background"><p>…</p></div>），
+        // 底色的唯一去处就是这些子块：下放给"未自带底色"的直接子块，保证底色可见。
+        if (bg !== undefined) {
+          for (let i = before; i < out.length; i++) {
+            if (out[i].backgroundColor === undefined) {
+              out[i].backgroundColor = bg;
+            }
+          }
+        }
       } else {
         pending.push(child);
       }
@@ -293,7 +320,7 @@ export class RichTextBuilder {
 
   /** 标题块：摊平行内内容生成文本块，标记 kind=heading 与级别（字号/字重由 computeStyle 已设置） */
   private pushHeading(out: RenderBlock[], node: RichNode, style: RichStyle, level: number): void {
-    const groups: InlineGroup[] = this.flattenInline(node.children, style);
+    const groups: InlineGroup[] = this.flattenInline(node.children, style, true);
     if (groups.length === 0) {
       return;
     }
@@ -306,9 +333,11 @@ export class RichTextBuilder {
   /** 引用块：内部内容递归走一遍 walkBlock（通常是多个 p），打包成带左右边距的 quote 块 */
   private pushQuote(out: RenderBlock[], node: RichNode, style: RichStyle): void {
     const inner: RenderBlock[] = [];
-    this.walkBlock(inner, node, style);
+    // 引用块底色「内联优先、config 兜底」；内部文本不再继承这个底色
+    this.walkBlock(inner, node, this.copyWithoutBackground(style));
     const block: RenderBlock = new RenderBlock();
     block.kind = 'quote';
+    block.backgroundColor = style.backgroundColor ?? this.config.quoteBackground;
     block.children = inner;
     // 首块顶部、末块底部贴齐引用背景，避免段间距落在背景内部造成多余空白；
     // 中间块保留间距作为块间分隔（与 walkListItem 的边距压缩行为一致）
@@ -327,6 +356,8 @@ export class RichTextBuilder {
     text = text.replace(/^\n+/, '').replace(/\n+$/, '');
     const block: RenderBlock = new RenderBlock();
     block.kind = 'code';
+    // 代码块底色「内联优先、config 兜底」：编辑器写在 pre 上的底色不再被 config 覆盖
+    block.backgroundColor = style.backgroundColor ?? this.config.codeBlockBackground;
     block.codeLang = this.extractLang(node);
     block.codeLinesTokens = this.buildCodeTokens(text);
     block.marginTop = style.marginTop ?? this.config.paragraphSpacing;
@@ -363,13 +394,12 @@ export class RichTextBuilder {
     out.push(block);
   }
 
-  /** 表格：解析 tr → td/th（单元格内容摊平、colspan/rowspan/align），统计最大列数供 Grid 模板 */
+  /** 表格：解析 tr → td/th（单元格内容摊平、colspan/rowspan/align），按 HTML 分格规则算真实列数 */
   private pushTable(out: RenderBlock[], node: RichNode, style: RichStyle): void {
     const block: RenderBlock = new RenderBlock();
     block.kind = 'table';
     block.marginTop = style.marginTop ?? this.config.paragraphSpacing;
     block.marginBottom = style.marginBottom ?? this.config.paragraphSpacing;
-    let maxCols: number = 0;
     // 行可能被 thead/tbody/tfoot 等容器包裹（如 <table><tbody><tr>…</tr></tbody></table>），
     // 需递归下钻容器收集 tr；但不进入 td/th，避免把单元格内嵌套表格的行错误收集进来
     const rows: RichNode[] = this.collectTableRows(node);
@@ -381,7 +411,11 @@ export class RichTextBuilder {
         }
         const cell: TableCell = new TableCell();
         cell.isHeader = cellNode.tag === 'th';
-        cell.groups = this.flattenInline(cellNode.children, style);
+        // td/th 自身的样式（背景色 / 字号 / 颜色）经 computeStyle 生效：
+        // 背景挂到单元格上（组件层优先于表头底色与斑马纹），其余作为内容的行内上下文
+        const cellStyle: RichStyle = this.computeStyle(cellNode, style);
+        cell.backgroundColor = cellStyle.backgroundColor;
+        cell.groups = this.flattenInline(cellNode.children, cellStyle, true);
         const csAttr: string | undefined = cellNode.attrs.get('colspan');
         cell.colSpan = csAttr !== undefined ? (parseInt(csAttr, 10) || 1) : 1;
         const rsAttr: string | undefined = cellNode.attrs.get('rowspan');
@@ -390,17 +424,11 @@ export class RichTextBuilder {
         cell.align = alignAttr !== undefined ? parseAlign(alignAttr) : AlignStyle.START;
         row.push(cell);
       }
-      // 列数按 colspan 展开后取最大（支持 <td colspan="2"> 跨列单元格的表格）
-      let colCount: number = 0;
-      for (const c of row) {
-        colCount += c.colSpan;
-      }
-      if (colCount > maxCols) {
-        maxCols = colCount;
-      }
       block.tableRows.push(row);
     }
-    block.tableCols = maxCols;
+    // 真实列数按 HTML 分格规则计算：rowspan 与 rowspan 叠加时，
+    // 后续行会被上方跨行格顶到更靠右的列，列数会大于任何一行 colspan 之和
+    block.tableCols = countTableCols(block.tableRows);
     if (block.tableRows.length > 0) {
       out.push(block);
     }
@@ -496,7 +524,7 @@ export class RichTextBuilder {
       }
     }
     if (contentNodes.length > 0) {
-      const groups: InlineGroup[] = this.flattenInline(contentNodes, parentStyle);
+      const groups: InlineGroup[] = this.flattenInline(contentNodes, parentStyle, true);
       if (groups.length > 0) {
         const inner: RenderBlock = this.makeTextBlock(groups, parentStyle);
         inner.marginTop = 0;
@@ -522,7 +550,12 @@ export class RichTextBuilder {
    *    实现链接可点击；
    *  - br   → 直接插入 '\n' 换行符（Text 原生支持），不额外成组。
    */
-  private flattenInline(nodes: RichNode[], parentStyle: RichStyle): InlineGroup[] {
+  private flattenInline(nodes: RichNode[], parentStyle: RichStyle,
+    stripContainerBackground: boolean = false): InlineGroup[] {
+    // 顶层上下文若是块级容器（p/div/h*/li/td），其背景属于容器本身（整段铺满），
+    // 不能跟着文本走；递归进元素后各自的 computeStyle 会带出自身背景
+    //（mark / code 的标签默认色、span 的内联色），不受此剥离影响。
+    const ctx: RichStyle = stripContainerBackground ? this.copyWithoutBackground(parentStyle) : parentStyle;
     const groups: InlineGroup[] = [];
     let spans: RichSpan[] = [];
     const flushSpans = (): void => {
@@ -546,7 +579,10 @@ export class RichTextBuilder {
         const s: RichStyle = this.computeStyle(n, style);
         if (n.tag === 'img') {
           flushSpans();
-          groups.push(this.makeImageGroup(n, s));
+          const ig: InlineGroup | undefined = this.makeImageGroup(n, s);
+          if (ig !== undefined) {
+            groups.push(ig);
+          }
         } else if (n.tag === 'a') {
           flushSpans();
           groups.push(this.makeLinkGroup(n, s));
@@ -557,9 +593,37 @@ export class RichTextBuilder {
         }
       }
     };
-    walk(nodes, parentStyle);
+    walk(nodes, ctx);
     flushSpans();
     return groups;
+  }
+
+  /**
+   * 复制样式但丢弃背景色（不原地修改：parentStyle 可能是调用方共享的对象）。
+   * 用于把"块级容器的底色"挡在行内内容之外。
+   */
+  private copyWithoutBackground(style: RichStyle): RichStyle {
+    const s: RichStyle = new RichStyle();
+    s.color = style.color;
+    s.fontSize = style.fontSize;
+    s.fontWeight = style.fontWeight;
+    s.fontStyle = style.fontStyle;
+    s.decoration = style.decoration;
+    s.decorationColor = style.decorationColor;
+    s.lineHeight = style.lineHeight;
+    s.letterSpacing = style.letterSpacing;
+    s.fontFamily = style.fontFamily;
+    s.textAlign = style.textAlign;
+    s.marginTop = style.marginTop;
+    s.marginBottom = style.marginBottom;
+    s.paddingLeft = style.paddingLeft;
+    s.paddingRight = style.paddingRight;
+    s.verticalAlign = style.verticalAlign;
+    s.width = style.width;
+    s.height = style.height;
+    s.borderRadius = style.borderRadius;
+    // backgroundColor 故意不复制
+    return s;
   }
 
   /**
@@ -587,11 +651,19 @@ export class RichTextBuilder {
     return sp;
   }
 
-  /** 生成行内图片组：解析 src/alt/width/height/圆角，组件层渲染为可点击预览的 Image */
-  private makeImageGroup(node: RichNode, style: RichStyle): InlineGroup {
+  /**
+   * 生成行内图片组：解析 src/alt/width/height/圆角，组件层渲染为可点击预览的 Image。
+   * src 为空（缺 src 属性，或协议被白名单拦截）时返回 undefined，由调用方丢弃 ——
+   * 否则会产出一个 src='' 的图片组，在真机上渲染成空占位框。
+   */
+  private makeImageGroup(node: RichNode, style: RichStyle): InlineGroup | undefined {
+    const src: string = this.resolveUrl(node.attrs.get('src') ?? '', true);
+    if (src.length === 0) {
+      return undefined;
+    }
     const g: InlineGroup = new InlineGroup();
     g.kind = 'image';
-    g.src = this.resolveUrl(node.attrs.get('src') ?? '', true);
+    g.src = src;
     g.alt = node.attrs.get('alt') ?? '';
     g.width = this.parseLen(node.attrs.get('width') ?? (style.width ?? undefined));
     g.height = this.parseLen(node.attrs.get('height') ?? (style.height ?? undefined));
@@ -629,6 +701,8 @@ export class RichTextBuilder {
   private makeTextBlock(groups: InlineGroup[], style: RichStyle): RenderBlock {
     const block: RenderBlock = new RenderBlock();
     block.kind = 'text';
+    // 块级底色随块走（组件层铺满整块），行内内容不继承它
+    block.backgroundColor = style.backgroundColor;
     block.groups = groups;
     // 混排（多组或含 link/image）时按 \n 拆成"视觉行"：
     // 纯文本单组不拆分——单个 Text 原生支持 \n 与 textAlign（走组件层单 Text 分支）。
@@ -745,7 +819,8 @@ export class RichTextBuilder {
    *     code 等宽+底色、sub/sup 上下标、blockquote 引用色、p 段间距等）
    *  3. 解析内联 style 属性并覆盖（优先级最高，见 applyInlineStyle）
    * 注意：strong 取 Math.max(600, 父级字重) 保证嵌套加粗不回退；
-   *       code 字号在父字号基础上 -1，sub/sup 额外 -2 并标记 verticalAlign。
+   *       code 字号在父字号基础上 -1，sub/sup 额外 -2 并标记 verticalAlign；
+   *       background-color 不随父级继承，但"行内祖先 → 行内子元素"会继承（见方法内注释）。
    */
   private computeStyle(node: RichNode, parent: RichStyle): RichStyle {
     const s: RichStyle = new RichStyle();
@@ -757,7 +832,18 @@ export class RichTextBuilder {
     s.decorationColor = parent.decorationColor;
     s.lineHeight = parent.lineHeight;
     s.letterSpacing = parent.letterSpacing;
-    s.backgroundColor = parent.backgroundColor;
+    // background-color 不可继承（CSS 规范）：块的底色由块自己持有，
+    // 行内元素的底色只来自标签默认（mark / code）或自身内联 style。
+    // 若在此处无条件继承父级背景，块级底色会顺 DOM 树漏给每一个子 Span，
+    // 渲染成"文字底下一条条碎色块"，而不是整段铺满。
+    //
+    // 但「行内元素嵌行内元素」必须继承：<code><strong>x</strong></code> 里 strong 重算
+    // 样式时若把 code 的底色丢掉，整句就只剩字色没有灰底。块级容器的底色不会漏进来 ——
+    // 它在 flattenInline / pushTextBlock / 表格单元格的入口已被 copyWithoutBackground 剥离，
+    // 因此这里读到的 parent.backgroundColor 只可能来自行内祖先（code / mark / 带底色的 span）。
+    if (parent.backgroundColor !== undefined && INLINE_TAGS.has(node.tag)) {
+      s.backgroundColor = parent.backgroundColor;
+    }
     s.fontFamily = parent.fontFamily;
     s.textAlign = parent.textAlign;
     s.marginTop = parent.marginTop;

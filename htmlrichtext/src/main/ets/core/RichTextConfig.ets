@@ -70,6 +70,24 @@ export class RichTextConfig {
   tableOddRowBackground: string = '#FFFFFF'    // 奇数数据行背景
   tableMinRowHeight: number = 0                // 最小行高(vp)，0 = 不设下限（行高测量结果与该值取大）
 
+  // ===== 表格滚动（列多 / 行长时的可读性）=====
+  /**
+   * 单列最小宽度(vp)：表格内容宽度 = 列数 × 该值。
+   * 内容宽度超出可用宽度时，表格区域可**独立横向滚动**（表头与表体一起横向滚动）。
+   * 设为 0 = 关闭横向滚动，列宽一律等分可用宽度（宽表会被压窄，长文本逐字换行）。
+   */
+  tableMinColumnWidth: number = 80
+  /**
+   * 表体最大高度(vp)：> 0 时表体在表格内部**独立纵向滚动**，超过该高度即出现滚动条，
+   * 适合长表格（几十行）不被页面高度淹没；0 = 不限制，表格随页面一起滚动（默认）。
+   */
+  tableMaxHeight: number = 0
+  /**
+   * 表头是否固定：表体独立纵向滚动时（tableMaxHeight > 0），
+   * 表头行渲染在滚动区之外，长表格滚动时始终可见。默认 true。
+   */
+  tableStickyHeader: boolean = true
+
   // ===== 图片 =====
   imageRadius: number = 4
   imageMargin: number = 10

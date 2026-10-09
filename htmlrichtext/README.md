@@ -171,6 +171,10 @@ config.linkOpenBrowser = false;      // 未传 onLinkClick 时点击链接默认
 config.codeBlockBackground = '#F6F8FA'; // 代码块背景
 config.enableCodeHighlight = true;   // 代码高亮开关
 config.imageRadius = 8;              // 图片圆角
+// 表格
+config.tableMinColumnWidth = 80;     // 列最小宽度(vp)：列数×该值 超出可用宽度时，表格区域独立横向滚动；0 = 关闭
+config.tableMaxHeight = 400;         // 表格最大高度(vp)：0 = 不限高；>0 时表体在表内纵向滚动
+config.tableStickyHeader = true;     // 配合 tableMaxHeight，长表格滚动时固定表头（默认 true）
 // ... 完整字段见 RichTextConfig.ets
 ```
 
@@ -187,7 +191,7 @@ config.imageRadius = 8;              // 图片圆角
 | 列表 | `ul` `ol` `li`（支持嵌套，圆点/空心圆/方块/数字序号） |
 | 代码 | `pre` `code` `kbd` `samp` `tt`（代码块横向滚动 + 轻量语法高亮） |
 | 引用 | `blockquote`（左边框 + 背景色） |
-| 表格 | `table` `tr` `td` `th` `thead` `tbody` `tfoot`（支持 colspan/rowspan、行内等高、表头背景/文字色/字重、斑马纹、最小行高、完整边框） |
+| 表格 | `table` `tr` `td` `th`（支持 colspan/rowspan、表头背景、边框；列多可横向滚动、长表可固定表头） |
 | 其他 | `hr` `br` `center` `section` `article` 等 |
 
 另支持：
@@ -227,11 +231,12 @@ A：改 `RichTextBuilder.ets` 的 `computeStyle` / `walkBlock` 增加规则，�
 
 ## 八、逻辑层单测（可选）
 
-解析器/构建器/高亮器为纯 TS 逻辑（无 ArkUI 依赖），可用 Node 直接验证：
+解析器/构建器/高亮器/表格布局为纯 TS 逻辑（无 ArkUI 依赖），可用 Node 直接验证：
 
 ```bash
-# 将 htmlrichtext/src/main/ets/core 下的 5 个逻辑层 .ets 复制为 .ts 后运行（Node 22+）
-# 需给相对 import 补 .ts 扩展名
+# 逻辑层副本保存在 test/ 下，与 core/*.ets 同名。
+# 改了 core/ 之后先同步副本，再跑单测（Node 22+）：
+python test/sync-core.py          # core/*.ets → test/*.ts（--check 只做一致性校验）
 cd test
 node --experimental-transform-types run.ts
 ```

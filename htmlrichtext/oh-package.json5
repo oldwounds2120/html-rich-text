@@ -1,7 +1,7 @@
 {
   // ohpm 三方库包配置（HAR 规范）
   "name": "htmlrichtext",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "鸿蒙 NEXT 自定义 HTML 富文本解析组件：手写解析器 + ArkUI 原生渲染，支持图片预览、代码高亮、表格、嵌套列表等，不依赖 WebView 与系统 RichText。",
   "main": "Index.ets",
   "author": {

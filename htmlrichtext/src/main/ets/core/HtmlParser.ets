@@ -108,7 +108,11 @@ export class HtmlParser {
       // 自闭合
       const isSelfClose: boolean = tagContent.endsWith('/');
       const content: string = isSelfClose ? tagContent.substring(0, tagContent.length - 1) : tagContent;
-      const nameMatch: RegExpMatchArray | null = content.match(/^[a-zA-Z][a-zA-Z0-9]*/);
+      // 标签名允许连字符/下划线/点/冒号（Web Components 的 <my-widget>、
+      // 命名空间标签 <o:p>、模板引擎残留的 <el-table-column> 等）。
+      // 旧写法 ^[a-zA-Z][a-zA-Z0-9]* 遇 '-' 即截断 → <my-widget> 被当成 <my> 打开，
+      // 闭合标签 </my-widget> 与栈中的 'my' 不匹配 → 永不闭合、吞掉后续全部内容。
+      const nameMatch: RegExpMatchArray | null = content.match(/^[a-zA-Z][a-zA-Z0-9_.:-]*/);
       if (nameMatch === null) {
         // 非合法标签，按文本处理
         this.appendText(parent, '<');

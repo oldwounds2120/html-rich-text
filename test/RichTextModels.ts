@@ -151,6 +151,15 @@ export class TableCell {
   colSpan: number = 1
   rowSpan: number = 1
   align: AlignStyle = AlignStyle.START
+  /**
+   * 单元格自身背景（td/th 内联 background-color）。
+   * 组件层优先取它，取不到才回落到表头底色 / 斑马纹规则（见 cellBackground）。
+   */
+  backgroundColor?: string
+
+  constructor() {
+    this.backgroundColor = undefined
+  }
 }
 
 /** 渲染块：由 RichTextBuilder 把解析树转换为扁平渲染模型 */
@@ -171,6 +180,12 @@ export class RenderBlock {
   lineHeight: number = 16       // vp，已乘字号
   textAlign: AlignStyle = AlignStyle.START
   fontSize: number = 16
+  /**
+   * 块级背景色（#RRGGBB / #RRGGBBAA）。
+   * 来源：该块自身的内联 background-color；pre/blockquote 无内联色时由 Config 兜底。
+   * 语义对齐浏览器：背景铺满整个块（含右侧留白），不继承给子行内内容。
+   */
+  backgroundColor?: string
   // heading
   headingLevel: number = 0
   // list
@@ -192,5 +207,6 @@ export class RenderBlock {
   constructor() {
     this.imageWidth = undefined
     this.imageHeight = undefined
+    this.backgroundColor = undefined
   }
 }

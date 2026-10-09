@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Ie9vXTRQbqcqo6wQgozHPs">
+<head data-page-node-id="otThqjQ6KWbVbQsW2FbBPB">
+<meta charset="utf-8" data-page-node-id="ZtiDdLTjBC3EnPGdMqY4jl">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="02QlsZqvFCmpqAdrV7p2IB">
+<title>htmlrichtext 显示兼容性测试样例 · 后台编辑器正文</title>
+<style>
+  /* ============================================================
+     本文件分两部分：
+     1) .usage —— 仅供浏览器阅读的使用说明（不入库）
+     2) article … —— "浏览器参照样式"，用无 class 的元素选择器作用于 payload
+     payload 内部一律不写 class，样式全部走 style 内联属性（模拟富文本编辑器产出）
+     ============================================================ */
+  :root { --ink:#2B2B2B; --sub:#57606A; --link:#1E6FFF; --line:#E5E6EB; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px 80px; background:#fff; color:var(--ink);
+         font:16px/1.7 "HarmonyOS Sans","PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+         -webkit-text-size-adjust:100%; }
+  .usage { max-width:760px; margin:0 auto 32px; padding:16px 20px; background:#F6F8FA;
+           border:1px solid var(--line); border-radius:8px; font-size:14px; line-height:1.7; }
+  .usage h1 { font-size:17px; margin:0 0 8px; }
+  .usage ul { margin:8px 0 0; padding-left:20px; }
+  .usage li { margin-bottom:6px; }
+  .usage code { background:#fff; border:1px solid var(--line); border-radius:3px;
+                padding:0 3px; font-family:"HarmonyOS Sans Mono",Consolas,monospace; }
+
+  /* ---- 浏览器参照样式：只作用于 payload 根容器 article 内部 ---- */
+  article { display:block; max-width:760px; margin:0 auto; }
+  article h1 { font-size:24px; font-weight:700; color:#1A1A1A; margin:18px 0 8px; }
+  article h2 { font-size:21px; font-weight:700; color:#1A1A1A; margin:18px 0 8px; }
+  article h3 { font-size:19px; font-weight:700; color:#1A1A1A; margin:18px 0 8px; }
+  article h4 { font-size:17px; font-weight:700; color:#333; margin:18px 0 8px; }
+  article h5 { font-size:16px; font-weight:600; color:#333; margin:18px 0 8px; }
+  article h6 { font-size:15px; font-weight:600; color:#333; margin:18px 0 8px; }
+  article p { margin:0 0 12px; }
+  article a { color:var(--link); }
+  article blockquote { margin:8px 0; padding:12px; background:#F7F8FA; color:var(--sub);
+                       border-left:3px solid #C9D1D9; }
+  article pre { background:#F6F8FA; color:#24292F; border-radius:8px; padding:12px;
+                overflow-x:auto; font:13px/1.6 "HarmonyOS Sans Mono",Consolas,monospace; }
+  article code { background:#F3F4F6; color:#D6336C; padding:0 3px; border-radius:3px;
+                 font-family:"HarmonyOS Sans Mono",Consolas,monospace; font-size:15px; }
+  article pre code { background:none; color:inherit; padding:0; font-size:13px; }
+  article table { border-collapse:collapse; margin:12px 0; font-size:14px; }
+  article th, article td { border:1px solid var(--line); padding:8px; text-align:left;
+                           vertical-align:top; word-break:break-word; }
+  article th { background:#F5F6F7; color:#1A1A1A; font-weight:600; }
+  article hr { border:0; border-top:1px solid var(--line); margin:16px 0; }
+  /* 与组件行为对齐：大图按容器宽度自适应，小图不放大 */
+  article img { max-width:100%; height:auto; border-radius:4px; }
+  article figure { margin:10px 0; }
+  article figcaption { text-align:center; color:#888; font-size:13px; }
+</style>
+</head>
+<body data-page-node-id="A4E75bkFC30g4apvIqbK7F">
+
+<!-- ==========================================================================
+     使用说明（浏览器可见，不属于入库内容）
+     ========================================================================== -->
+<div class="usage" data-page-node-id="mrUvZHenFjBtaZt47W59ow">
+  <h1 data-page-node-id="pBtdKjWj6A0HXPVy89XJ8v">htmlrichtext 显示兼容性测试样例（后台编辑器正文）</h1>
+  <p data-page-node-id="tNtykfsNYTJ8PsKJ6VXBJk">用途：把下面 <code data-page-node-id="q2tt7ufhCXNpCC7i4HGVrU">DB-PAYLOAD-BEGIN</code> / <code data-page-node-id="LvQNsoQ3qbLYDvG7Gw9GNa">DB-PAYLOAD-END</code> 两个注释标记之间的内容，
+  作为一整段 HTML 字符串存入数据库；App 从库里取出后交给 <code data-page-node-id="sI7Ej13Edy2BsUB7tzi0eX">HtmlRichText</code> 渲染，
+  再逐项核对本文各章节的说明与文末《附录：用例清单》里的期望表现。</p>
+  <ul data-page-node-id="9XVFdHKrBl1gRXxVzFcJEh">
+    <li data-page-node-id="8PaaIRYLJ3KUg7K6dmI2Ae"><strong data-page-node-id="RMSPILAVHlpzvFuEFLnNmL">payload 内部没有任何 <code data-page-node-id="qQGSILgEZQgNGmN4enApZz">class</code> 属性</strong>，样式一律走 <code data-page-node-id="BvLyKFQMFq1WZlbrBv6DMr">style</code> 内联属性，
+      刻意模拟后台富文本编辑器的产出（UEditor / TinyMCE / Quill / CKEditor 这一类）。
+      唯一例外是 payload 根节点 <code data-page-node-id="BmSMAA5C6EbgURQA3wgxeT">&lt;article&gt;</code>，它只是 CMS 详情页常见的外层容器，
+      组件按普通容器处理；后台若直接存编辑器裸输出，去掉这一层即可，内容不受影响。</li>
+    <li data-page-node-id="JcDfL5cATDEUCekkA8Wirc"><strong data-page-node-id="qqo21VfpVGy8ro0ZMqZZkN">代码块的语言识别走 <code data-page-node-id="DImxyIkh53iu2RvfqUc7ZG">data-language</code> 属性</strong>（组件支持该写法）。
+      后台若产出的是 <code data-page-node-id="i0unrPYDCz2nxm0JSrFvvs">class="language-xxx"</code>，组件同样认——本文件按"不出现 class"
+      的要求统一用 <code data-page-node-id="vfnQwPIz667Qx27P84HNr3">data-language</code>。</li>
+    <li data-page-node-id="ux6FQO8g3OtlYTfzvpXAxu"><strong data-page-node-id="XsUCHi2mX2EBgY9AOqBZa9">数据库字符集必须用 utf8mb4</strong>：样例含 emoji、4 字节生僻字（𠮷，U+20BB7）与全角符号，
+      用 utf8/utf8mb3 会在入库阶段就被截断成 <code data-page-node-id="0TJ5BWMEtO4a2OUmt6iv6Z">?</code>，那不是组件的问题。</li>
+    <li data-page-node-id="8bmjslV5E0i1vANvhfThfL">本页在浏览器里的渲染效果即"期望效果"参照。但要注意：<strong data-page-node-id="hmZdkggHRNgeOZYcaEAyFx">浏览器会渲染、组件不支持的属性</strong>
+      会让两边出现合理差异，已在各章节逐条标注（重点是 <code data-page-node-id="a1T2hKwR3M4FJMETVilaUl">text-indent</code>、
+      <code data-page-node-id="ZBDRlDFK4gnmhmINpCBW1M">margin</code>/<code data-page-node-id="TMjWPBla3UpoUJIB5ZrLuR">padding</code> 简写、<code data-page-node-id="QB4TFwaAN8tp0RCsBenqAE">border</code>、表格属性）。</li>
+    <li data-page-node-id="eTi7JQoDG4IeqITmbkGnG1">注释里的 <code data-page-node-id="NpmOteZLrDXQgmrRWUuHz4">CASE-xx</code> 是给测试用的编号，组件会跳过注释，渲染结果里不会出现。</li>
+    <li data-page-node-id="SfEcboClfM0E7kuGH89NMZ">图片走 picsum.photos 在线占位图，测试设备需要联网；另有 1 张故意指向无效域名的坏图，
+      用来验证加载失败回调与占位背景。</li>
+    <li><strong>表格的两项滚动配置</strong>（都在 <code>RichTextConfig</code> 里）：
+      <code>tableMinColumnWidth</code> 默认 <code>80</code>，列数 × 该值超过可用宽度时表格区域可独立横向滚动，设 <code>0</code> 关闭；
+      <code>tableMaxHeight</code> 默认 <code>0</code>（不限制、随页面滚动），设成 <code>400</code> 这类值后表体在表格内部纵向滚动，
+      <code>tableStickyHeader</code> 默认 <code>true</code>，此时表头行固定可见。9.6 与附录那张长表就是这两个能力的验证对象。</li>
+  </ul>
+
+  <h1 style="margin-top:16px;" data-page-node-id="BCxkECPxIDLFq49zoOJsLb">入库前先用逻辑层跑一遍的预置发现</h1>
+  <p data-page-node-id="ERhbtsNK53ogLtffuGGZ8y">写这份用例时，顺手用组件自己的 <code data-page-node-id="MY2XiL2GdT2DlnAoEwCbX6">HtmlParser</code> + <code data-page-node-id="N2ebbOvPhiNnxP3iVpkTvO">RichTextBuilder</code>
+  （<code data-page-node-id="T72EDL1n4GKdtixLn0b8mH">test/</code> 下的纯 TS 副本）跑了整段 payload，确认"用例本身是不是有效的"，
+  结果撞出两个需要修的点，都已固化成本文里的用例：</p>
+  <ul data-page-node-id="nwgbJ8XHUGOy4yLtUrL5Jf">
+    <li data-page-node-id="54JkVbcjtlCl1rBhP8vKAO"><strong data-page-node-id="HOYTyJJDJKkZoUudoWtSMh">① 含连字符的自定义标签会把后续内容全部吞掉（严重，见案例 E5）</strong><br data-page-node-id="nuSdhC5eQUlt5O2YJgThD8">
+      标签名正则只接受 <code data-page-node-id="s9hnUHngZ1dHczN8UJj9yd">[a-zA-Z][a-zA-Z0-9]*</code>，遇到 <code data-page-node-id="rXB0M6gC6sc45W6MOAGooQ">-</code> 就截断：
+      <code data-page-node-id="1u9gowdemajMYGqVBnjRu6">&lt;my-widget&gt;</code> 被当成 <code data-page-node-id="1ODL0M9bM2hgYGslCFrqzj">my</code> 打开，而 <code data-page-node-id="TaAVGn8EnOQ7fMMo29EZPB">&lt;/my-widget&gt;</code>
+      切分出来是 <code data-page-node-id="t4tZIuG00D0hl5ydHkVRKu">my-widget</code>，跟栈里的 <code data-page-node-id="aior0AOX6YnNUlEDqf4F1i">my</code> 对不上，于是永不闭合、
+      一路吞并到文末。资讯正文里 GitHub / Google 的嵌入卡片、Angular/Vue 风格组件标签都带连字符。
+      实测这段 payload 里附录那张 51 行的表就是这样被整张吞掉的。<br data-page-node-id="0G6MiCAAy60w9uwFAqNSZn">
+      <strong data-page-node-id="puHlHZf0Mf4CCYwZAS32Y0">同一个正则也吃掉了冒号</strong>，所以 Word 粘贴常见的 <code data-page-node-id="PQejGPaK35iKRu9FuGjvLP">&lt;o:p&gt;</code>
+      会被当成 <code data-page-node-id="0nvzSoLypEiNQpF1KRGKbM">o</code> 标签（见案例 E7）——后台粘 Word 内容时同样会中招。<br data-page-node-id="PE5k3F27uq9CHGU9CsG9Eh">
+      建议：标签名正则放宽到 <code data-page-node-id="Brz57aQfvCEShmRBlmBjAv">[a-zA-Z][a-zA-Z0-9_.:-]*</code>，闭合标签用同一套规则。</li>
+    <li data-page-node-id="epl8Ad9OdsXaHz5pmGBnWZ"><strong data-page-node-id="f69eafRGwGNOjEFHXghv6b">② 行内被拦截的图片没有丢弃（见第五节"被拦截的图片协议"那句）</strong><br data-page-node-id="Ao6VG8zT0HqvoTJ3lOJLf2">
+      <code data-page-node-id="DaFAwGDEal9onYEL0dZAHC">src="javascript:..."</code> 经协议白名单过滤后返回空串，块级 <code data-page-node-id="pCpOrerPz7i7GNdFIvFA74">pushImage</code>
+      有空值守卫会直接 return，但行内 <code data-page-node-id="nhAiFx1IYCJH3CiLdQafTf">makeImageGroup</code> 没有，仍然生成了一个
+      <code data-page-node-id="3701SehFFsFOSEaEYPTb4Q">src</code> 为空串的图片组，组件层可能渲染出一个空占位框。<br data-page-node-id="6mH5TDyxdvVuGuG9y738UI">
+      建议：<code data-page-node-id="eGECHH9c82yz0U9E1oeCBa">makeImageGroup</code> 里补一条 <code data-page-node-id="yiDxGBxyeLxBnK9UFupyXQ">src.length === 0</code> 时不产出组的判断。</li>
+    <li data-page-node-id="5nLcG1k30SoYYrIRJh2qLQ"><strong data-page-node-id="90m2VFI4OzmUSp1OC8Dk2V">③ 后台编辑器的高频产出物组件目前不认，建议评估</strong><br data-page-node-id="zXysYDJrUeVtCi0w6RsZF7">
+      <code data-page-node-id="2xxkkBjwfmu6OzXXyYFDR3">text-indent:2em</code>（中文 CMS 首行缩进的标准写法）不被解析，段落会顶格显示；
+      <code data-page-node-id="6LCS05U6mNCWOwPdgsK4bL">margin</code>/<code data-page-node-id="ox9dP3QAj6Z7EEyv0cOmTp">padding</code> 简写不被解析（只认 <code data-page-node-id="77KR7p9rhfXP8BIbZJHwT7">margin-top/bottom</code>、
+      <code data-page-node-id="FTEoqFLAV2jX1nkVOyPpnv">padding-left/right</code>）；<code data-page-node-id="w8MTmyWiuu6HCkBQfxKqWD">&lt;td&gt;</code> 上的背景色与文字样式<strong>已生效</strong>（v1.0.3 修复），仅内边距仍统一走 <code>tableCellPadding</code>（不读 td 自己的 padding）；
+      <code data-page-node-id="qDaoZkz7ZuiWBhEKeL0A68">&lt;li&gt;</code> 上的内联样式同样不生效；
+      <code>&lt;pre&gt;</code> 与 <code>&lt;blockquote&gt;</code> 的背景已改为<strong>内联优先、config 兜底</strong>（v1.0.3），内边距仍走 config；<code data-page-node-id="o1t3I5jSNGxat43L8KLsTP">&lt;table border cellpadding cellspacing&gt;</code>
+      属性被忽略。<br data-page-node-id="Fy0eW4QCTXQVKa0fW3T3Ce">
+      这几条都不是崩溃，但会让"编辑器里看到的"和"App 里看到的"对不上，
+      是用户最容易感知到的差异，建议至少支持 <code data-page-node-id="Tfgy49CvnPuKaJumYaAaAt">text-indent</code> 与 <code data-page-node-id="AOM74TBZGRg17zrl99TKdm">margin</code>/<code data-page-node-id="rxFOesccNVd5g2EquhAYUd">padding</code> 简写。</li>
+    <li data-page-node-id="7LLe97Vo0EYceD0QDPzZK1"><strong data-page-node-id="Y6FX5rarjrcioiXz6DuO8k">④ 已确认属于设计取舍、不算缺陷的行为</strong><br data-page-node-id="37IFkU0nZBAaJwDIqAIhGe">
+      <code data-page-node-id="DExrWZd6N013rD5Ogsu7h0">&lt;p&gt;A&lt;p&gt;B</code> 不做隐式闭合（案例 E4）；未闭合标签向后吞并（案例 E1~E3、E6）；
+      <code data-page-node-id="Ji3RzqTrw2WwVG2TOV5Coz">&lt;ol start="9"&gt;</code> 与 <code data-page-node-id="EFVsD35XLMKTyVXbVQpK4w">&lt;ul type="square"&gt;</code> 的属性被忽略；
+      <code data-page-node-id="vc71RdYh3apZmh8DWnLRbr">&lt;font color&gt;</code> 的属性被忽略；<code data-page-node-id="XSfmmielChvBQSoApjbBum">&lt;pre&gt;</code> 出现在 <code data-page-node-id="c1fJzMWbf6qsZmlm4M6MqA">&lt;li&gt;</code>
+      内会降级为行内文本；图片宽高<strong data-page-node-id="3JnzyaVeQToRY9812EDaDP">属性优先于内联 style</strong>（浏览器恰好相反）。</li>
+    <li><strong>⑤ 背景色链路已修复（v1.0.3，本文档新增"背景色专项"一组用例）</strong><br>
+      旧版把所有自定义 <code>background-color</code> 都丢了，根因是两层叠加：解析层把
+      <code>background-color</code> 当成了"可继承属性"（CSS 里它<strong>不可继承</strong>），
+      于是块级底色顺着 DOM 树漏给了每一个子 Span，渲染成"文字底下一条条碎色块"；
+      同时 <code>RenderBlock</code> / <code>TableCell</code> 里根本没有承载背景的字段，块级底色无处安放。
+      还有一层是真机渲染：<code>Span</code> 并不支持 <code>backgroundColor</code>
+      （从 CommonMethod 继承来的方法在 Span 上会被静默忽略，编译通过但不出效果），
+      行内底色必须改用 <code>textBackgroundStyle</code>。<br>
+      本版语义：块级背景<strong>整段铺满</strong>（含右侧留白）且<strong>不被继承</strong>；
+      行内 <code>&lt;span&gt;</code> 的底色只覆盖文字；<code>&lt;mark&gt;</code> 默认浅黄保留；
+      <code>&lt;td&gt;</code>/<code>&lt;th&gt;</code> 自身底色优先于表头底色与斑马纹；
+      <code>&lt;pre&gt;</code>/<code>&lt;blockquote&gt;</code> 背景内联优先、config 兜底。</li>
+    <li><strong>⑥ 容器包裹会让内部块级元素的内联样式整体失效（v1.0.3 修复，见 CASE-14f）</strong><br>
+      正文只要被 <code>&lt;div&gt;</code> / <code>&lt;article&gt;</code> / <code>&lt;section&gt;</code> 包一层
+      （后台模板里的 <code>&lt;div&gt;</code> 几乎是标配），里面所有块级子元素的
+      <code>font-size</code> / <code>color</code> / <code>background-color</code> / <code>margin</code>
+      就会<strong>全部失效</strong>——容器在递归处理块级子标签时，没有重新做一遍样式叠加。<br>
+      这一条是本轮修背景色时顺带撞出来的：新增的 <code>CASE-14a</code> 背景死活不落块，
+      查下去才发现根因不在背景，而在这里。<strong>后台若把外层容器剥掉，正文看不出问题；
+      一旦容器保留，就会大面积走样。</strong></li>
+    <li><strong>⑦ 表格跨行跨列布局重写（v1.0.3，见 9.3 与附录 15a~15d）</strong><br>
+      旧实现把"单元格在行内的数组下标"直接当列号，并用 <code>columnStart/columnEnd/rowStart/rowEnd</code> 做绝对定位。
+      但 ArkUI 的 Grid <strong>只在同时设置 columnsTemplate 与 rowsTemplate 时才支持这四个属性</strong>：
+      只设 columnsTemplate 时 <code>rowStart/rowEnd</code> 完全无效、列号冲突会"直接换行"，
+      于是 rowspan 失效、行中间的 colspan 会把后面的单元格挤到下一行，真机表现为整表错位。<br>
+      本版新增 <code>core/TableLayout.ets</code>：先按 HTML 分格规则算出真实矩阵（含补位空单元，并修正了
+      "rowspan 叠加时列数被低估"的老算法），渲染层改为顺序填充 + irregularSize。<br>
+      顺带补上两项新能力：<code>tableMinColumnWidth</code>（列多时表格区域独立横向滚动）、
+      <code>tableMaxHeight</code> + <code>tableStickyHeader</code>（长表格表体内部纵向滚动、表头固定）。</li>
+  </ul>
+  <p data-page-node-id="azDxFSILItUJ6k54RreEYS">复跑方式：<code data-page-node-id="5qZd6LtpRWBhjwCPzWZFep">node --experimental-transform-types verify-fixture.ts</code>
+  （脚本会校验 payload 内无 class、打印块类型分布 / 表格行列数 / 图片清单与宽高，
+  并断言"必须可见 / 必须不可见"的文本）。</p>
+</div>
+
+<!-- ==================== DB-PAYLOAD-BEGIN ==================== -->
+
+<article data-page-node-id="fCyVLFDEqTy1eTw8VHReNU">
+
+<!-- CASE-01 | h1~h6 标题层级、标题内行内标签、标题内联样式覆盖 -->
+<!-- CASE-02 | 段落：长文、多段落、段间距、仅空白段落 -->
+<!-- 说明：以下所有块级元素自带 style 内联属性，即后台富文本编辑器的产出形态 -->
+
+<h1 style="font-size:24px;font-weight:700;color:#1A1A1A;line-height:1.4;margin-top:18px;margin-bottom:8px;" data-page-node-id="BmXGzRreubE62DneWkMokC">把富文本从 WebView 里拽出来：HarmonyOS 原生富文本组件踩坑记</h1>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;margin-top:0px;margin-bottom:12px;" data-page-node-id="06Uy8Q6t39HqrYidVBZGZd">这个项目起因很朴素：资讯详情页的正文，官方给的两条路都不太合脚。
+<strong data-page-node-id="UyRWPMRR4gyuzXt6qmALkE">Web 组件</strong>渲染没问题，但滚动位置、图片手势、字体跟原生一套体系隔着一条缝；
+<strong data-page-node-id="vz6qnJkXhRCGg7q9VlveCn">RichText 组件</strong>又只认自己那套结构化标签，拿到后台编辑器吐出来的 HTML 只能干瞪眼。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;margin-top:0px;margin-bottom:12px;" data-page-node-id="6Uvvl7QlTOy809UAhnqq4T">于是我用十七天重写了一个：手写递归下降解析器 + ArkUI 原生渲染，中间产物是一棵渲染树，
+最后落成一组扁平的 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;" data-page-node-id="NMQ5z3NZICaovYUpakltm6">RenderBlock</code>。现在它支持 <em data-page-node-id="ED86AHsyOzUtaf7mid0hSG">h1~h6</em>、<u data-page-node-id="3TCTbhYDOb2VHDCtIhfdrh">下划线</u>、
+<del data-page-node-id="PMCuapopgzdFYvP7S13ZWM">删除线</del>、<mark data-page-node-id="lBJ4KPkRFG5QUQwnH7slYa">高亮</mark>、行内 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;" data-page-node-id="BsVB6iP2lYKuaNgmXZdscH">code</code>、上标 x<sup data-page-node-id="jafpSvQHqFPh30IT41kOFU">2</sup>、
+下标 H<sub data-page-node-id="tZq7BPS8WBWh7Fy8n9K7EL">2</sub>O、链接、图片、嵌套列表、引用块、代码块和表格。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;margin:0px;padding:0px;text-indent:2em;" data-page-node-id="9HqksyOWpNBAUCrvGg9oAZ">这一段刻意写成后台编辑器的典型产出：<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="wJ1PmSwluhKQDD1uicZvQV">margin:0px;padding:0px;text-indent:2em</code>。
+浏览器会给首行缩进两个字，<strong data-page-node-id="ez3odbWw1aRBZcZBSq85Yy">组件不认 text-indent，会顶格显示</strong>——这是本次重点记录的一处差异。
+另外注意 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="BUfF8LEC0LCdbgy63eZ3Vg">margin</code>
+简写也不被解析（只认 margin-top / margin-bottom），所以段落间距仍按组件的 paragraphSpacing 走。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="aoDsvYUWDlzQ3EbL7A4oi2">这篇是我自己整理的验收清单，写完直接扔进数据库当测试数据用。
+每一节都对应一组真实踩过的坑，文末有完整用例表。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;line-height:1.4;margin-top:18px;margin-bottom:8px;" data-page-node-id="stVRnDvtYcrHPCRgN1QBJD">一、标题层级：先把 h1~h6 全部摆出来</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="lqEBslf5Z8xDIBQPT6rJls">组件默认给六级标题配了递减的字号（24/21/19/17/16/15）、字重（700/700/700/700/600/600）
+和独立的颜色。下面这一段是全量对照，肉眼扫一遍就能看出有没有塌陷、有没有和正文混在一起：</p>
+
+<h3 style="font-size:19px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="in3paeIX55KEmSt6sl2B2F">三级标题：H3 · 19vp / 700</h3>
+<h4 style="font-size:17px;font-weight:700;color:#333333;margin-top:18px;margin-bottom:8px;" data-page-node-id="UZPIt6NX1HKvuR6AdYoCaR">四级标题：H4 · 17vp / 700</h4>
+<h5 style="font-size:16px;font-weight:600;color:#333333;margin-top:18px;margin-bottom:8px;" data-page-node-id="xuU54KeJY9MCEpYKixLNHW">五级标题：H5 · 16vp / 600</h5>
+<h6 style="font-size:15px;font-weight:600;color:#333333;margin-top:18px;margin-bottom:8px;" data-page-node-id="KA5a2KUUi8cN2gcxdxAhQ0">六级标题：H6 · 15vp / 600</h6>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="1DQRXjald4IvTQbUlDqdEC">顺带测三种"标题里的花样"：</p>
+
+<h3 style="font-size:19px;font-weight:700;color:#1A1A1A;" data-page-node-id="0K5U81GC6GL7BCxFA6OFkQ">带<code style="font-family:Consolas,monospace;font-size:18px;color:#D6336C;background-color:#F3F4F6;" data-page-node-id="t35katsl3UDC9eMmFS8eeX">行内代码</code>与<strong data-page-node-id="oND92y7tka0EmEGyiPzwE3">加粗</strong>的标题</h3>
+<h4 style="font-size:17px;font-weight:700;color:#FF6B00;" data-page-node-id="G91EXAOEdTCILjjmIDQFMu">被内联 style 改色的标题（应覆盖默认色）</h4>
+<h5 style="font-size:16px;font-weight:600;color:#333333;text-align:center;" data-page-node-id="nx5r3VMFNLVgNP6V4cwWnj">写了 text-align:center 的标题（内联样式应覆盖标题默认样式，居中生效）</h5>
+<h5 style="font-size:16px;font-weight:600;color:#333333;" align="center" data-page-node-id="Q8IAKFJQvqNydWCrMX8RZg">写了 align 属性的标题（组件不读 align，应保持左对齐）</h5>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="dGJjTBT0e7tzh0mlkJZXFZ">二、行内标签：一次全量核对</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="YVOo4uO5uwIotBlTvWARYV">正文里最容易被吞掉的就是这些"看起来一样"的标签。下面按类别排开，
+每一组后面括号里是期望表现。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="tDu3YzUycZEsGRc9LplkhW"><strong data-page-node-id="Tx78gufHXiZNFFEBblUuIC">strong 加粗</strong>、<b data-page-node-id="pGcq9KEcpm8kd7Ws9bhTXa">b 加粗</b>、<em data-page-node-id="hQoN8bFZvs3817hp6ztSBI">em 斜体</em>、<i data-page-node-id="DqaSiXTQ8Be4yDLjdfzOi0">i 斜体</i>、
+<cite data-page-node-id="Go8Q00xd1SgPEAWfCCSC9a">cite 斜体引用</cite>、<var data-page-node-id="4Enu5tKZRydQ8B8fzWUThG">var 变量斜体</var>、<u data-page-node-id="qe1GYJeIOXkuVNhaF9QsHf">u 下划线</u>、<ins data-page-node-id="mijIjRQh4lCMejpeMsV4Ud">ins 下划线</ins>、
+<s data-page-node-id="l4uKo1pECh9bPv3IW6aNUx">s 删除线</s>、<del data-page-node-id="LmWRgNXLNyokoVrPZdIXV3">del 删除线</del>、<strike data-page-node-id="UwM46W6l5BvNiDT2Ja5dq9">strike 删除线</strike>。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="tpdDCX7hgCL65ZQcwKhkZf"><mark data-page-node-id="GLRVgFLDVWTL9icY6GF4md">mark 默认黄底</mark>、
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;" data-page-node-id="m0lGUFoOdGXcCgk3qEt5YT">行内 code</code>、
+<kbd data-page-node-id="GOeVBvKkWemJQuzHa9R0RO">Ctrl</kbd> + <kbd data-page-node-id="F5XkHmWpWCzQoPTl2B25RF">S</kbd>、<samp data-page-node-id="IQFngXfOz2wU7CAAfH3cYz">samp 等宽</samp>、<tt data-page-node-id="hoTZTUPiGKmpuIv3ETNjeB">tt 等宽</tt>、
+<small data-page-node-id="BdTNoML9HM5chDT3L7rFNq">small 小两号</small>、<big data-page-node-id="mv5OtsHd4A0R0EBmZxoJ2S">big 大两号</big>、x<sup data-page-node-id="T74yfjPfQ4QTlPACU4mIUZ">2</sup> + y<sub data-page-node-id="8w1BfOmziHhFufseU9aDPQ">1</sub>、
+<abbr title="HyperText Markup Language" data-page-node-id="D5otToQlNsTNAm1XytzU8i">ABBR 缩写</abbr>、<q data-page-node-id="WxhmDv8VCdnyaYuL6CYZSW">q 短引用</q>、
+<span data-page-node-id="cSsDIf2jnkWqJLJ8jA8npl">裸 span</span>、<label data-page-node-id="iaoNsIB9rmXRqxBPLxr5j0">label</label>、<time datetime="2026-09-11" data-page-node-id="DOmDhM9wDxDrSdZvdXHg71">time 标签</time>、
+<data value="42" data-page-node-id="cTD66eUUcEa9SXAJESreO1">data 标签</data>、<bdi data-page-node-id="fRe1PiKG3Grgg3vTLqsXQ9">bdi</bdi>、<bdo dir="rtl" data-page-node-id="6wEKnLrVCAocDPJNJNGoEE">bdo</bdo>。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="bDAhN86GNZx0KwmAfysCKZ">嵌套叠加：<strong data-page-node-id="6nqzi4IIv2ZwHPsYhlNJtr">加粗里套<em data-page-node-id="nBIjP47JIhVzbDQVeEA6OZ">斜体</em>再套<u data-page-node-id="DCBADgFqG20EFE5gKWgCtZ">下划线</u>最后套<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;" data-page-node-id="5UfgOFdCyWOAaEvyeMRGV5">代码</code></strong>，
+以及 <strong data-page-node-id="hUmT7go4KREvObaon57vWl"><del data-page-node-id="8yeRjXRy6nxV0L3A71Oeei">加粗 + 删除线</del></strong>、<em data-page-node-id="04t0zUFWSZ3OpSJBbrNcYA"><mark data-page-node-id="M3fzsiBhcyfFqp5rQCzalQ">斜体 + 高亮</mark></em>。
+期望：多属性并行生效、互不覆盖。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="V34LrU58FCLCiphDuMhjk6"><font color="#FF0000" size="5" face="Arial" data-page-node-id="e93PXKolzGsFhscyUjn7N6">font 标签</font>——
+编辑器从老 CMS 里带出来的老写法，组件不读 font 的属性，
+期望<strong data-page-node-id="V7ijLMY3V80alVAvbqcOLH">样式不变（继承正文）</strong>，文字正常显示不丢失。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="ZIBSkwA9njOQTMkkpBduXw">三、内联 style：能继承什么，不能继承什么</h2>
+
+<p style="font-size:18px;font-weight:700;color:#FF6B00;" data-page-node-id="3wgUswtXB1rTZ97PANfZXr">这一整段是内联 style：橙色、18vp、加粗。</p>
+<p style="font-size:17px;color:#008000;background-color:#FFF3CD;" data-page-node-id="jBGxudrZiT8KcxKRbGiPVH">换行测试：<span style="color:#1E6FFF;font-weight:700;" data-page-node-id="jgE6wjmHnKHLZuJiRCx6HP">局部 span 覆盖蓝色</span>，
+然后回到段落自己的绿色，并带浅黄底纹。背景色应<strong>整段铺满</strong>（每行右侧到屏幕边缘的留白也要有底色），而不是只在文字底下铺一条。这是 v1.0.3 修正后的期望——本文档旧版写的是"随文字行走"，那是照着当时的错误实现反推出来的，与浏览器不一致，已更正。</p>
+<p style="font-size:16px;letter-spacing:2px;" data-page-node-id="fYIgywkxgPWYp0aezwCbnw">字间距 2px 的段落，中文间距拉开后仍应正常换行不断行。</p>
+<p style="font-size:16px;text-align:center;" data-page-node-id="jN7yoyHH9K6jObcGj3uVx3">居中文本</p>
+<p style="font-size:16px;text-align:right;" data-page-node-id="36GLNJMIqPgDcAnaeuDwm8">右对齐文本</p>
+<p style="font-size:16px;text-align:justify;" data-page-node-id="Erty3EvzxA4QzrhtKZO8i3">两端对齐文本（ArkUI 无 Justify 枚举，组件会退化成左对齐，这是已知取舍）。</p>
+<p style="font-size:16px;line-height:2.2;" data-page-node-id="B2YMLuF8RwpO6IqDg6sZEm">行高 2.2 倍的段落，用于确认行高确实按倍数乘字号换算成 vp，而不是被忽略。</p>
+<p style="font-size:16px;margin-top:24px;margin-bottom:24px;padding-left:20px;border-radius:8px;" data-page-node-id="xkTUFLI0TZUsEHGyntDoow">同时给了外边距、左内边距与圆角。
+期望：上下间距明显变大、整段左缩进 20vp；圆角对纯文本块无视觉影响（不报错即可）。</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="Bstd9i6Y417z1tdqJtCrbR">四种颜色写法各来一处：
+<span style="color:#abc" data-page-node-id="1n1vZjsDTLFum00yFSR7Ro">三位简写</span> / <span style="color:rgb(255,107,0)" data-page-node-id="SFMljOFWKGOXncXTJRjloP">rgb()</span> /
+<span style="color:rgba(30,111,255,0.5)" data-page-node-id="RraWeYqf1qXoCSQCCin2Tt">rgba() 半透明</span> /
+<span style="color:orange" data-page-node-id="6H4LmbNYY9JzaCkMG83S7I">英文色名</span>；字体族也试一个：
+<span style="font-family:Consolas,'Courier New',monospace;" data-page-node-id="3P7o0tizyqdDf89HTpFWwI">Consolas 等宽字体</span>。</p>
+<p style="font-size:16px;display:flex;box-shadow:0 0 4px #000;float:left;border:2px solid red;text-shadow:0 1px 2px #999;" data-page-node-id="bUkFBNCVNzIDBSgltYifW7">这条写了五个组件不支持或不完整支持的属性
+（display / box-shadow / float / border 简写 / text-shadow）。期望：<strong data-page-node-id="7i4rWlYidq5aWIa42jBsH8">安静地忽略，不抛异常、不丢文字</strong>。</p>
+<p style="font-size:16px;padding-top:10px;padding-bottom:10px;margin-left:12px;margin-right:12px;" data-page-node-id="F8BHpH2Evq6D6CiBiJP1Vf">这条只用了"简写以外的变体"：
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="s7co1o6slrkRAt6GuJMZBs">padding-top</code> /
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="nN4mxT4BzGpP3nmMAmkdbA">padding-bottom</code> /
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="u2I7DUPTfcx8J44rVGGHHH">margin-left</code> /
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="13b41A1c9QpCCRNcClvC7G">margin-right</code>。
+组件只认 padding-left / padding-right / margin-top / margin-bottom，
+所以这四个属性全部无效——期望视觉上没有任何变化，这是已知边界。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="vZFXfdbYjGiKIAT86lrDo0">四、链接：一个 href 的十种写法</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="3WEXFuwLTS8Dy7z9Mox1zS">先是最常规的四种，全部点一遍：
+<a href="https://www.harmonyos.com" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="soehAGgUIGDnFszT16gSR3">官方站点（绝对 https）</a>、
+<a href="http://www.htmlrichtext.com/" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="j4Gn0D7fVQI5IRzGSy0FiC">组件官网（http）</a>、
+<a href="https://developer.huawei.com/consumer/cn/doc/" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="mpHUixdCOBplN0zXw5boSR">带路径的文档链接</a>、
+<a href="https://docs.openharmony.cn/" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="lrcxL847xUcUy5FyNDTpYz">另一个域名</a>。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="IWIrTIpiJyvmLDwiM7uEDO">样式变体：<a href="https://www.harmonyos.com" style="color:#D6336C;font-weight:700;text-decoration:underline;" data-page-node-id="V3FNay6rdVHeDITpNwUOOF">链接内联改色改字重</a>、
+<a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="3cCJBNfhekGFm7gQVdIuHM"><strong data-page-node-id="AX7vGzUubeXL1qCUKnuiXe">链接里套加粗</strong></a>、
+<a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="AcQTJwi2gAedefys6y0alC"><code style="font-family:Consolas,monospace;font-size:15px;" data-page-node-id="Is8D6C3Gk32rV3YeoYwm7u">链接里套代码</code></a>。
+期望：链接色（或内联色）+ 下划线仍在，点击仍可跳转。</p>
+
+<!-- CASE-04a | 相对路径链接：无 baseUrl 应原样返回；配置 baseUrl 后应拼接 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="9vQnDTGFtDmnj7HNhGouMD">相对路径与协议相对：<a href="guide/install.html" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="5WCOsp7SDNB3nKTDkt7dP7">相对路径链接（需配 baseUrl 才可点开）</a>、
+<a href="//www.htmlrichtext.com" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="SQDdgIPNgFPH7GOO4nr3Tc">协议相对链接</a>。
+期望：不崩溃、可渲染；无 baseUrl 时相对路径拼不出完整地址，点击后跳转失败属预期。</p>
+
+<!-- CASE-04b | 链接内嵌 br：每段保留 href 仍可点击（v1.0.2 修复项） -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="jQwBDV2TwQFQJN1AB4yZkT">换行链接（v1.0.2 修过的点，两行都要能点）：
+<a href="https://www.harmonyos.com" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="yP2o1K8JFJArJiDiLntC0u">第一行写着超长链接文字<br  data-page-node-id="3QHCFSuOhtjsSQU3KbVagn"/>第二行继续写着超长链接文字</a>。</p>
+
+<!-- CASE-04c | 链接包图片、无 href 链接、空链接、编辑器常见的 target/rel -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UXPbkLfA9NeGjV79oE7dQD">链接包图片：<a href="https://www.htmlrichtext.com" data-page-node-id="evvauLhJdL3excuKCD6zTU"><img src="https://picsum.photos/seed/rt-link-img/240/120" alt="被链接包裹的图片" style="width:240px;height:120px;" data-page-node-id="q74LT77wY16tNNKOibHfFj" /></a>
+&nbsp;后面跟一段普通文字，确认图片不会被挤到下一行。无 href 的链接：<a style="color:#1E6FFF;" data-page-node-id="MJECQ14FWmhuQAJdO7z4VI">这行没有 href</a>，
+空 href 的链接：<a href="" style="color:#1E6FFF;" data-page-node-id="Dk2emOGEFfCz4ctZzHwcpY">这行 href 是空的</a>。
+编辑器常带的属性：<a href="https://www.harmonyos.com" target="_blank" rel="noopener noreferrer" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="Afot5PU7dgOYbP5f3BoHtc">带 target 与 rel 的链接</a>
+（这两个属性组件不读，期望照常渲染并可点）。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="PFXbf7S3WChSnJ7fVkurgM">五、图片：大图自适应、小图不放大、坏图有占位</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="HIFOjgaFsBGpgyWlD8sSFQ">正文大图，尺寸写在 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="B756bCfziEf5iqcBRLU86y">style</code> 里
+（编辑器就是这么干的，不写 width 属性）。声明 800×450，超过屏宽 60%，应铺满宽度并按比例缩放，即忽略后台设的固定宽高：</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="WOH6rMVeJDd3UAo5hEdKhY"><img src="https://picsum.photos/seed/rt-large/800/450" alt="正文大图 800x450" style="width:800px;height:450px;" data-page-node-id="5bP05RTqJOnKqSROIHIcfV" /></p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="QXFgylT5SIEJSisDEH81jZ">只有宽度、没有高度（style 写法）：<img src="https://picsum.photos/seed/rt-widthonly/600/300" alt="只有宽度" style="width:600px;" data-page-node-id="SkscWGWA9brWuhmASsAwD2" />，
+期望保持比例不拉伸、不塌成一条线。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="chmc96qFxT0FjxKLQbElM3">写成百分比宽度的（编辑器拖拽缩放图片时常产出百分比）：<img src="https://picsum.photos/seed/rt-percent/500/250" alt="百分比宽度" style="width:100%;" data-page-node-id="FiDH4ZT6DgMXwnPXr0FdfA" />，
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="HxcRWgKcaDupxjxSIeq7bU">parseLen</code> 对
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="9HhCFaBYP1kQ8VkApJ0fYu">%</code> 返回 undefined，
+等于没给尺寸，期望按原尺寸或自适应，至少不能 0 高。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="Bbc6Ihe97zB4FCg0cvjzhK">没有写任何尺寸：<img src="https://picsum.photos/seed/rt-nosize/200/120" alt="无尺寸声明" data-page-node-id="w1pI5W9cCqBWYzJuQneyEK" />，
+期望按原尺寸或自适应渲染，至少不能为 0 高。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="u8g5oswLoGW7Xhkc44XjxK">小图 / 图标 / 表情（48×48，低于屏宽 60%，应保持原名尺寸<strong data-page-node-id="q3y9A9cQz9in2Zode1Je1R">不放大</strong>）：
+<img src="https://picsum.photos/seed/rt-icon/48/48" alt="小图标 48x48" width="48" height="48" style="width:48px;height:48px;" data-page-node-id="KVL6llpxHvLdljst5lCEmi" />
+<img src="https://picsum.photos/seed/rt-icon2/32/32" alt="更小的图标" width="32" height="32" style="width:32px;height:32px;" data-page-node-id="DwM0aiQucy3XQyOWNUFG3E" />
+<i data-page-node-id="wfE4O1REBhe0Ezsb0oQHOH">图标与文字在同段内混排，期望基线大致对齐、文字正常换行。</i></p>
+
+<!-- CASE-05a | 属性与内联 style 同时给尺寸时，谁说了算 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="FH6bJv2HVNmZKRubVpk3UP">属性与 style 冲突的图：<img src="https://picsum.photos/seed/rt-conflict/400/200" alt="属性与样式冲突" width="400" height="200" style="width:800px;height:400px;" data-page-node-id="QqcNr0avAHEQJmiPQNa4X4" />。
+属性写的是 400×200、style 写的是 800×400。<strong data-page-node-id="o0rY8Abq51dRn8P2wRT0kH">浏览器里 CSS 优先，会按 800×400 渲染</strong>；
+组件读的是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="0TuNjMtGDiNSpU6TqZXs8K">attrs.get('width') ?? style.width</code>，
+<strong data-page-node-id="3NQ6m6PEM6ZL5RIHPzY5Af">属性优先</strong>，会拿到 400×200。这是一处需要记录的差异（400 低于屏宽 60%，按小图保持原尺寸）。</p>
+
+<!-- CASE-05b | 图片加载失败：占位背景 + onImageLoadError 回调 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="DuCZsaqT0hUVPtIrIGdinB">坏图（域名不可解析）：<img src="https://img.example.invalid/not-found.png" alt="这张图预期加载失败" style="width:300px;height:160px;" data-page-node-id="dKAGgeys9IRfqI0CDQIYaR" />，
+期望显示占位底色、不闪退，并触发 onImageLoadError 回调。</p>
+
+<!-- CASE-05c | data: 内嵌图（PNG / SVG 两种编码） -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="Y0EvDVOjUzHbdrGB8WNmCG">内嵌图一（base64 PNG，80×40）：
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAAoCAIAAADmAupWAAAAQ0lEQVR42u3PMQ0AAAgDsCnBIv4vcMFDkxpoqueVCAsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsL31q2n1cendxn9AAAAABJRU5ErkJggg==" alt="base64 PNG" data-page-node-id="wf5rG7gEVJoNUIqwo0tZE3" /></p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="QcCmHdjAiSnLcj2QZPI9dX">内嵌图二（base64 SVG，120×60）：
+<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iNjAiPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iNjAiIHJ4PSI2IiBmaWxsPSIjRkY2QjAwIi8+PHRleHQgeD0iMTAiIHk9IjM2IiBmb250LXNpemU9IjE1IiBmaWxsPSIjZmZmZmZmIj5EQVRBIFVSSTwvdGV4dD48L3N2Zz4=" alt="base64 SVG" data-page-node-id="fwRDFqaMAns5bUDqeZKstF" /></p>
+
+<!-- CASE-05d | 懒加载图：编辑器/图床常见 data-* 占位属性 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="ljB26nNepHVuadsCk93ahB">懒加载图（src 是真的，另有 data-original / data-src / data-w 等编辑器加的属性，
+组件不读 data-*，期望不影响渲染）：<img src="https://picsum.photos/seed/rt-lazy/400/220" data-original="https://picsum.photos/seed/rt-lazy/400/220" data-src="https://picsum.photos/seed/rt-lazy/400/220" data-w="400" data-h="220" alt="懒加载图" style="width:400px;height:220px;" data-page-node-id="jnNGjGnJAqAJ9A4OrcU4Mk" /></p>
+
+<!-- CASE-05e | figure/figcaption 容器 + 连续多图（预览序号） -->
+<figure style="margin:10px 0px;" data-page-node-id="PnqNeijE8Zrn6JIufm6Pwl">
+  <img src="https://picsum.photos/seed/rt-fig1/800/400" alt="图 1：带图注的大图" style="width:800px;height:400px;" data-page-node-id="0JRlSG3axea7Y9XJAXWIX5" />
+  <figcaption style="text-align:center;color:#888888;font-size:13px;" data-page-node-id="oKM6MHC2HTXMucEthGAjmH">图 1：figure + figcaption 图注（居中灰色小字）；点图应能全屏预览，且从第 1 张开始。</figcaption>
+</figure>
+<figure style="margin:10px 0px;" data-page-node-id="KRTZf0FfzKtqBxWHyNInkn">
+  <img src="https://picsum.photos/seed/rt-fig2/600/300" alt="图 2：第二张大图" style="width:600px;height:300px;" data-page-node-id="qDOHlR254L3xjkWopi1Xd0" />
+  <figcaption style="text-align:center;color:#888888;font-size:13px;" data-page-node-id="anpBnMP3Zp01E4H6WgMZFH">图 2：连续多图，点这张应直接从第 2 张开始预览，可左右滑动。</figcaption>
+</figure>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="EDIvTjuRbTJMVaHY4e9iqO">被拦截的图片协议：<img src="javascript:alert(1)" alt="伪协议应被丢弃" data-page-node-id="YQQOeVOjy3D6aPSFZ0FYVm" /> 期望：整张图不渲染，
+不出现空白占位框，也不报错。（这一行里除了本句文字，不应再有别的内容。）</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="eBJRmmPaRuv63LGcgIjJyE">六、列表：嵌套三层之后最容易出错</h2>
+
+<h3 style="font-size:19px;font-weight:700;color:#1A1A1A;" data-page-node-id="TPl83lQY1ft342HeTJkgZe">无序列表（三级嵌套 + 多种 marker）</h3>
+<ul style="margin-top:8px;margin-bottom:8px;padding-left:18px;" data-page-node-id="sN3f7E8lNoFYJoALz5cSCH">
+  <li style="margin-bottom:4px;" data-page-node-id="gEFiVqccvcQt5IIL8P7dEF">一级：纯文本项</li>
+  <li style="margin-bottom:4px;" data-page-node-id="9WsLQI4l59Dbfmu55gvfsC">一级：含<strong data-page-node-id="F9Trc7xGU63ua83GJEJyAH">加粗</strong>、<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="WXdcPJKOSAfCLMZHmEht37">行内代码</code>与<a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="ipfUO53D7bJXfZFBt3hMdM">链接</a>的项
+    <ul style="padding-left:18px;" data-page-node-id="BZfYiNuRZaxPxCRHKaC87b">
+      <li data-page-node-id="NaZTAsZMgDYKK3idM2iOzZ">二级 marker 期望为空心圆 ○</li>
+      <li data-page-node-id="3KVmQC1oNd97IKJauoWROZ">二级：含较长文本，用于确认换行后悬挂缩进是否与 marker 对齐，不会让第二行跑到圆点下面
+        <ul style="padding-left:18px;" data-page-node-id="QqnG7rrhcGK2GiXZhBToQy">
+          <li data-page-node-id="6FQCoKa4EZtnku8WIEHwll">三级 marker 期望为实心方块 ▪</li>
+          <li data-page-node-id="A2EclWiHBfwpd0BxFCmZCU">三级：再嵌套一层就到极限了</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li style="margin-bottom:4px;" data-page-node-id="Tgb1pvRM2cpqoYlgpCQVhL">一级：最后一项</li>
+</ul>
+
+<h3 style="font-size:19px;font-weight:700;color:#1A1A1A;" data-page-node-id="HFdyFodFOuiKdcVEr5lWHR">有序列表（含长项与行内标签）</h3>
+<ol style="margin-top:8px;margin-bottom:8px;padding-left:18px;" data-page-node-id="zJSjYMXEojnoCNJG8Jrght">
+  <li style="margin-bottom:4px;" data-page-node-id="QLYZIeEnr54QmwPQ2AuaFv">第一步：把 HTML 字符串塞给组件（<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="8K9FQzsqolM9pzA6vQjE0A">@Prop html</code>，变化自动重解析）</li>
+  <li style="margin-bottom:4px;" data-page-node-id="fiFMJi6NOnHMtTmROoDNKI">第二步：按需注入 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="iNoK2w6MIXIzPrzkTlBwCn">RichTextConfig</code>，不传就用默认样式</li>
+  <li style="margin-bottom:4px;" data-page-node-id="M2VJ9bs7LtVxlTg6D5jFCA">第三步：验证<em data-page-node-id="99wXdBQZUFHioSkuDsxIlH">斜体</em>、<u data-page-node-id="NuWzqWGkRDV83LXHOkLDDv">下划线</u>在列表项里不被吞掉</li>
+  <li style="margin-bottom:4px;" data-page-node-id="ERz7dd39Qq6bsgQBGoUpTP">第四步：确认序号是 1. 2. 3. 4. 连续递增，不跳号</li>
+  <li style="margin-bottom:4px;" data-page-node-id="asP31qYCImKR7xc5i8PqWz">第五步：写了 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="h3tVVVthcDQ4gyuoy5qOUH">start="9"</code> 的有序列表另起一段测试（见下）</li>
+</ol>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="yrq9C1v7owOWSOUYEnjsWP">下面是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="0xq7pZdeMzCHBCNnSkp643">&lt;ol start="9"&gt;</code>，组件<strong data-page-node-id="1wLlvgbXlAlWVNfTAikxtY">不读 start 属性</strong>：
+期望从 1 开始编号，这是已知限制，不算 bug。</p>
+<ol start="9" style="padding-left:18px;" data-page-node-id="d0HBprsprthxhECHf2zP9n">
+  <li data-page-node-id="amEUKJ0ai7u2XHoX232QAL">期望显示为 1. 而不是 9.</li>
+  <li data-page-node-id="dzg1WvGFDJL09z0wsRHaek">第二项</li>
+</ol>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="T6NxaN3zDrKh7MwzhswbCw"><code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="os1xkSkj58I5RgQFrkM367">&lt;ul type="square"&gt;</code> 同理，type 属性被忽略，marker 仍按层级走。</p>
+<ul type="square" style="padding-left:18px;" data-page-node-id="YKOXZsFC9c0nfyOt0hITEV">
+  <li data-page-node-id="1LjYH4ktSKnaj6ojeUFHXD">期望 marker 仍是 •</li>
+</ul>
+
+<h3 style="font-size:19px;font-weight:700;color:#1A1A1A;" data-page-node-id="BRbmKKMdVfkBKtKzmnsThh">列表项的边界写法</h3>
+<ul style="padding-left:18px;" data-page-node-id="eRMxTFFOeGA0wq3WbQxzyq">
+  <li data-page-node-id="WBKSlZPNViV9rFgB6V8tQH">第一行内容<br  data-page-node-id="psxbg84VHztb0C4KKBkic3"/>第二行用 br 换行，期望两行同属一个列表项，marker 只在第一行</li>
+  <li data-page-node-id="iFf2cRSBMmJRtvxcOoozFp">项里有图片：<img src="https://picsum.photos/seed/rt-li-img/120/80" alt="列表内小图" style="width:120px;height:80px;" data-page-node-id="qPHFks2IlbH4OwO4gGt9dP" /> 期望不撑破列表宽度</li>
+  <li style="color:#FF6B00;font-size:20px;" data-page-node-id="1mbuLryJ84fSNpmQu5YQse">项上写了内联 style 改色改字号：<strong data-page-node-id="K37vURrlQRXKnTOWLoxXCu">期望不生效</strong>——li 自身的样式不参与计算
+    （walkListItem 只摊平 li 的 children），所以这一项应保持正文颜色与字号，
+    但 li <strong data-page-node-id="dG8AngMeIOO1W8WZAHFO1D">内部</strong>的 span 是有效的：<span style="color:#008000;font-weight:700;" data-page-node-id="pFg5LBlWy6vpvmBQIjOnDA">这个 span 的绿色加粗应当生效。</span></li>
+  <li data-page-node-id="MFgSJsdPGqPGhybuSGpLI4"></li>
+  <li data-page-node-id="cHPsItydzcZOzxEuL8jeSr">空项上面那个应该没有内容，期望不渲染空行或只留极小高度</li>
+  <li data-page-node-id="ZWeS6CBVgNbpe8VIfCDXh2">项里嵌代码块（<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="MEPoCPuBe9PeMLAnjRJBcR">&lt;pre&gt;</code> 在 li 内，组件只按行内文本处理，属已知降级）
+    <pre data-language="javascript" style="background-color:#F6F8FA;border-radius:8px;padding:12px;" data-page-node-id="Lvfxpz6Qc8gyz2K7UAGYYb">const a = 1;
+console.log(a);</pre>
+  </li>
+</ul>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="1umGya9phh5vAjh6Glexnr">七、引用块：那个 669vp 的幽灵</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="ZztgB4hZw5BxUnzfHye5xe">v1.0.2 之前，引用块的高度会莫名其妙变成 669vp，跟内容多少无关。
+根因是左侧竖线用了一个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="TdiLtFryDyOPzZoltHN2Cm">height('100%')</code> 的子组件，
+在外层 Scroll 的无界高度约束下被解析成"最大可用高度"。现在竖线改用
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="cKxADDAeKCssq5rVwk1kg6">border.left</code> 实现，高度完全由内容驱动。</p>
+
+<!-- CASE-07a | 引用块自带内联样式：背景/边框/内边距走 config，color 可继承 -->
+<blockquote style="margin:8px 0px;padding:12px;background-color:#F7F8FA;border-left:3px solid #C9D1D9;color:#57606A;" data-page-node-id="tmWzyEUCeDwKe1OPgi4Z2b">
+  <p style="font-size:16px;line-height:1.7;margin:0px;" data-page-node-id="04Bb1kPj4V6LnYXl7po7bM">单段引用：这一块的背景高度应当紧紧贴着文字，上下各留一个 padding，不能拉长。
+  注意这里 blockquote 自带背景/边框/内边距的内联样式，<strong data-page-node-id="koPUEQ2B4pQpQ6xsSZQoYN">背景色改为内联优先（v1.0.3）</strong>，
+  背景色、左侧竖线、内边距全由 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="aBIYZiNHABLzvk60n9RZrY">RichTextConfig</code>
+  的 quoteBackground 兜底（仅在未写内联背景时才用它）；左侧竖线与内边距仍由 quoteBorderColor / quotePadding 决定；
+  但 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="H8dbTOAGPkqMwyvCgQxvUv">color</code> 是会被继承的，
+  所以引用块里的文字色用的是上面那个 #57606A。</p>
+</blockquote>
+
+<blockquote style="margin:8px 0px;padding:12px;background-color:#F7F8FA;border-left:3px solid #C9D1D9;" data-page-node-id="KMAKldeMKOZKGZp2Txnsqm">
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="BU7jpAXuxj9eNtzhMwVuI1">多段引用第一段：用来确认段间距不会跑到背景外面形成一条空白带。</p>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="j6fl75Q4MUhVHoVsEFVs3K">多段引用第二段：中间段落之间应该保留正常段间距，作为视觉分隔。</p>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="wz4bV1nzB59KwiGfzjhwKh">多段引用第三段：最后一段的下边距应被清零，背景底部不留多余空白。</p>
+</blockquote>
+
+<blockquote style="border-left:3px solid #C9D1D9;padding-left:12px;" data-page-node-id="Vz3GlZU3pXdBWil0zhN8Wx">
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="LX1vGGRSm5DeS9cRoIeUXQ">引用块里放列表：</p>
+  <ul style="padding-left:18px;" data-page-node-id="CoCTFkQVUR0FSmi0Hlo0H9">
+    <li data-page-node-id="pJLgXiPgbye5bax7SVuoom">列表项一</li>
+    <li data-page-node-id="1RzZWDRYMRfvuY7TL5957y">列表项二</li>
+  </ul>
+</blockquote>
+
+<blockquote style="border-left:3px solid #C9D1D9;padding-left:12px;" data-page-node-id="h1PAIHl572ApBnabP3v5Xq">
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="imM7GHtMGvKtfubEhhlxnV">引用块里放代码块（这个 pre 刻意写了深色背景与亮色文字，模拟后台代码高亮插件）：</p>
+  <pre data-language="bash" style="background-color:#2B2B2B;color:#F8F8F2;padding:12px;border-radius:8px;" data-page-node-id="YlveZ38YZSPbnYLadACvJg">git commit -m "fix: quote height" &amp;&amp; git tag v1.0.2</pre>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="YU689MZRAF6TKWHXdLPFxo"><strong data-page-node-id="Iuv7dABUp6TuRWAOYbPbXE">组件的代码块样式不读内联 style</strong>，
+  会按 v1.0.3 的新规则处理：<strong>背景内联优先</strong>，所以这里应当是深色底 #2B2B2B，而不是回落到 config 的浅灰底；文字色仍走 config 的 codeBlockTextColor（深色），于是深底配深字、对比度偏低——这是"背景内联优先、文字色仍归 config"的混合结果，属本版已知行为。</p>
+</blockquote>
+
+<blockquote style="border-left:3px solid #C9D1D9;padding-left:12px;" data-page-node-id="rT7PyoqI7H8SsLo4vGysZl">
+  <h4 style="font-size:17px;font-weight:700;" data-page-node-id="QF32YRUUD88gVBUq0uD5fv">引用块里放标题</h4>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="inwsgH4gHEZgXqHJLMIP7v">标题应继承引用块的文字颜色，而不是用标题自己的深色，视觉上要"陷进去"。</p>
+  <blockquote style="border-left:3px solid #C9D1D9;padding-left:12px;" data-page-node-id="DAiB63DjQjD9o1obNkU0eD">
+    <p style="font-size:16px;line-height:1.7;" data-page-node-id="hchmCior1AOfekXwXEJJzH">引用里再嵌套一层引用，确认不会崩、层级缩进合理。</p>
+  </blockquote>
+</blockquote>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="kuZViDkLzOZLDseh76q7EB">八、代码块：要横向滚动，不要断行毁缩进</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="RG1CSRvgkJdhRxwB5hhgEi">代码块会把空格替换成不换行空格，保证每行不自动折行，超宽靠横向滚动条解决。
+下面这段每行都带缩进，重点看四层缩进是否对齐、能否左右滑动。
+语言识别用的是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="BtLHC3tGjUAua36ZRmDsGd">data-language</code> 属性
+（后台若用 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="cL6P5nyaooV0E7NE84ltcC">class="language-xxx"</code>，组件也认）：</p>
+
+<pre data-language="typescript" style="background-color:#F6F8FA;color:#24292F;border-radius:8px;padding:12px;font-family:Consolas,monospace;font-size:13px;line-height:1.6;" data-page-node-id="3efsyanxkch27bafCpLNtB"><code style="font-family:Consolas,monospace;font-size:13px;background-color:transparent;color:#24292F;" data-page-node-id="mDEgYwBs9VVUjXSwPyrB9O">// 轻量语法高亮：注释、关键字、字符串、数字、函数名
+import { RichTextConfig } from './core/RichTextConfig';
+
+export class RichTextBuilder {
+  private readonly maxCacheSize: number = 32;      // 常量
+  private cache: Map&lt;string, RichNode&gt; = new Map(); // 泛型尖括号在 HTML 里必须转义
+
+  build(html: string): RenderBlock[] {
+    const root: RichNode = HtmlParser.parse(html);
+    const blocks = new Array&lt;RenderBlock&gt;();
+    if (html.length &gt; 0 &amp;&amp; this.cache.has(html)) {
+      console.log("cache hit: " + html.length + " chars, ratio = " + 0.8732);
+      return this.cache.get(html)!;
+    }
+    return blocks;
+  }
+}</code></pre>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="XmJQDDKA0Kw1tJuUsnIYql">没有任何语言标记的代码块（高亮应关闭/走纯文本路径，颜色回退到代码块默认色）：</p>
+<pre style="background-color:#F6F8FA;border-radius:8px;padding:12px;" data-page-node-id="D2MF7WlN4fv752XvfxOfBD">这是一段没有 data-language 的 pre 内容
+  第二行缩进两个空格
+    第三行缩进四个空格
+	第四行是 tab 缩进（应展开为四个空格宽）
+末尾行</pre>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="in7Q8gOqMt4IWprN6jPSoy">代码块里的空行（应该保留行高，而不是被吃掉）：</p>
+<pre data-language="json" style="background-color:#F6F8FA;border-radius:8px;padding:12px;" data-page-node-id="z8bBl98d27IRTY9fEdiXaB">{
+  "name": "htmlrichtext",
+
+  "version": "1.0.2",
+
+  "tags": ["harmonyos", "arkui", "rich-text"]
+}</pre>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="7EvVEPeKS89OnVG8ZvTzD8">超长单行（必须横向滚动，绝不能折行把变量拆成两半）：</p>
+<pre style="background-color:#F6F8FA;border-radius:8px;padding:12px;" data-page-node-id="yC1PhnbJ1irX6xb9mxEp3N">const url = "https://cdn.example.com/a/really/really/really/long/path/segment/segment/segment/segment/segment/asset.png?v=20260911&amp;format=webp&amp;width=1080&amp;quality=85";</pre>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="JPBpasSuI6STlzU2A6JBkv">代码块与内联 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="Q5oDJ6rXFbOuSWuJZ9XVxv">HtmlParser.parse(html)</code> 混在同一段，
+然后是普通文字。期望行内代码有底色和粉色文字，代码块有灰底和圆角。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="XNKwOjQQSGKQqxOFipBbNG">九、表格：最难啃的一块骨头</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="zf4CMF5PTyCd2njUE9DJCY">表格单独拆了一个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="RjjOmwrcMqMcjvkHsKNifU">TableBlockView</code>：
+用 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="Sv3c7Nzh3B5zQvG80IPih3">onAreaChange</code> + 双
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="6rCDEg1QcFNfqZipdqriOB">minHeight</code> 测量行高，
+斑马纹、表头样式、底部边框都在它内部管。下面按"从简到繁"排开，
+所有表格都写成编辑器的产出形态——<code data-page-node-id="piKGmhNXv6hKYwhPRmsyTv">border</code>/<code data-page-node-id="Oiz6n2qiWopYytjpufkaXw">cellpadding</code>/<code data-page-node-id="WCZCTtpNyo5qmMi6UFvTt4">cellspacing</code>
+属性和 <code data-page-node-id="fAaksUn8ZdM8l5KDE832ry">border-collapse</code>、<code data-page-node-id="QYgaWSpidVlgRg1RXGaLtd">width:100%</code> 内联样式都会带上，
+<strong data-page-node-id="qyO5AMhlWgHEKu9Pu5s9VE">这些组件全都不读</strong>，边框与内边距一律由 config 的 tableBorderColor / tableCellPadding 决定。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="ei3Yvr572lbQHOv4FU4C5O"><strong data-page-node-id="DLSskqOoO5PbMTcSLfa8CD">9.1 最简表格（无表头）：</strong></p>
+<table style="border-collapse:collapse;width:100%;" border="1" cellpadding="0" cellspacing="0" data-page-node-id="ZVidsoxI2cTGQ7V7iQfFdG">
+  <tr data-page-node-id="FnhyrBCskAumyvVUlJK8vg"><td style="border-width:1px;border-color:#E5E6EB;padding:8px;" data-page-node-id="vK3Mf3nQo69XoncHldGSBk">单元格 A1</td><td style="border-width:1px;border-color:#E5E6EB;padding:8px;" data-page-node-id="jHYHIXWG5kqTZu8CFADl64">单元格 B1</td></tr>
+  <tr data-page-node-id="xnMb8GiV5e5TzCFNewskFH"><td style="border-width:1px;border-color:#E5E6EB;padding:8px;" data-page-node-id="eqOhUu4WNiDe1khX2wX3M0">单元格 A2</td><td style="border-width:1px;border-color:#E5E6EB;padding:8px;" data-page-node-id="NJ4iAcpu2IFDuFbS4U1UC8">单元格 B2</td></tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="jzlOFIBd1feVVDB4EqcyEr"><strong data-page-node-id="kqaL0Jf9S7ZUNkp4kyDHCn">9.2 标准表格（thead + tbody + th，被测最多的一种）：</strong></p>
+<table style="border-collapse:collapse;width:100%;" border="1" cellpadding="0" cellspacing="0" data-page-node-id="YQaP9cSfuJQFGZJHLXQ5hy">
+  <thead data-page-node-id="YMDHuPba8d1vOGiQCsmkAe">
+    <tr data-page-node-id="zGNghRMsB1hiv5LY9GthEP">
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="7We2oZmhL5cZ9rxmlpHJzz">能力项</th>
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="hyetnrQOpG2kh9KDUJDMZX">实现方式</th>
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="4EUxVVUvT3YBfdfw1YXna4">状态</th>
+    </tr>
+  </thead>
+  <tbody data-page-node-id="cWGUDAljZnZeIxisCBuTzg">
+    <tr data-page-node-id="MVhsNJtAQ9N17njYijEyIw"><td style="padding:8px;" data-page-node-id="25UQLrh4xtxLfAxBFAeMrQ">行内样式</td><td style="padding:8px;" data-page-node-id="sDOpT8XAkKBmeTE3JeRvtr">Text + Span</td><td style="padding:8px;" data-page-node-id="yvCQRHQfJjVEJRJIrbmkKN">已完成</td></tr>
+    <tr data-page-node-id="CdntMZU8AJL2LumpZMAzh6"><td style="padding:8px;" data-page-node-id="7ygFc1Fft9rCbDcJlY3hxQ">图片</td><td style="padding:8px;" data-page-node-id="t8kNz8KDmiDjLQtgYmYTIG">独立 Image + Flex wrap</td><td style="padding:8px;" data-page-node-id="EjfH6BEpBvJQdsGpsJW1Do">已完成</td></tr>
+    <tr data-page-node-id="F96n7pvx00OPFG4npxru2k"><td style="padding:8px;" data-page-node-id="45z0Pzv7I80NEwWVUF34tQ">表格</td><td style="padding:8px;" data-page-node-id="qEKyQ7YCSMxRI6UmcS14Er">Grid + 列模板</td><td style="padding:8px;" data-page-node-id="Rzr6fGQeq4aNGKAXa5BGVv">已完成</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;"><strong>9.3 colspan / rowspan（v1.0.3 修复，本轮重点回归）：</strong>这是最容易崩的一组。
+旧渲染层把"单元格在行内的数组下标"直接当列号，一旦行中间出现 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">&lt;td colspan="2"&gt;</code>，
+它后面的单元格列号就会偏左、与前一格撞车；而 ArkUI 的 Grid 在只设 columnsTemplate 时，遇到已被占用的位置会
+<strong>直接换行</strong>放置 —— 真机上的表现是"行尾单元格被挤到下一行、跨行完全失效、只剩半张表"。
+本版改为在构建层先按 HTML 分格规则算出每个单元格的真实起始列（会自动跳过被 rowspan 占用的格子），
+渲染层只按顺序填充，跨行/跨列交给 Grid 的 irregularSize 占据。<br>
+<strong>逐行核对（下面这张表 5 行 3 列，共 10 个单元格）：</strong>第 1 行是横跨三列的表头；
+第 2 行依次是"普通单元格"与"跨两列（它从第 2 列开始，只跨第 2、3 列）"；
+第 3 行是"行首跨两列 + 行尾单列"，<strong>行尾单列必须还在第 3 列，不能掉到下一行</strong>；
+第 4~5 行的第 1 列被"纵向跨两行"合并成一整格，第 5 行只有两格且从第 2 列开始（第 1 列让给跨行格）。</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="01OieOsCxNEbCTWpHLsi2k">
+  <tr data-page-node-id="AA8XwSxMuAE2swrKZgGrr9">
+    <th colspan="3" style="background-color:#F5F6F7;padding:8px;" data-page-node-id="EVRx73BAluBpAPCHj2INse">表头跨三列（colspan=3）</th>
+  </tr>
+  <tr data-page-node-id="rtpxgaXbemiqEQaPHp9uT5">
+    <td style="padding:8px;" data-page-node-id="G8xTa0A4TZ9ncK8QcxGVmg">普通单元格</td>
+    <td colspan="2" style="padding:8px;" data-page-node-id="vsTCCPIPyDOLi5Q0BQKpXP">跨两列，且位于行中间（高风险用例）</td>
+  </tr>
+  <tr data-page-node-id="X6EJ3NfN7uT1J2i22B1iPq">
+    <td colspan="2" style="padding:8px;" data-page-node-id="pTWu3nyH3WSJJpydAiHN1G">行首跨两列</td>
+    <td style="padding:8px;" data-page-node-id="BaczKWvY0tHJMEsWybJQGO">行尾单列</td>
+  </tr>
+  <tr data-page-node-id="Ksv5BTzdT8KVJlA220v8ge">
+    <td rowspan="2" style="padding:8px;" data-page-node-id="tDShIjO2Vh0HzhY53Vuh57">纵向跨两行（rowspan=2）</td>
+    <td style="padding:8px;" data-page-node-id="zQrrqciB14FTpkqSh3c7F5">右侧第一行</td>
+    <td style="padding:8px;" data-page-node-id="BaJhXgoR0997GJ4sLhAmCA">右侧第一行</td>
+  </tr>
+  <tr data-page-node-id="YiMQmUCxCfD0oka6dvKAf4">
+    <td style="padding:8px;" data-page-node-id="UorsUmPT2Lr1shhdBAYQYO">右侧第二行</td>
+    <td style="padding:8px;" data-page-node-id="2U1AIPyQUw8G3u619XMCqc">右侧第二行</td>
+  </tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;"><strong>9.4 单元格样式与对齐：</strong>单元格（td/th）自身内联的
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">color</code> /
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">font-size</code> /
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">background-color</code>
+<strong>生效</strong>（v1.0.3 起；背景色优先于表头底色与斑马纹），但 <code>text-align</code> 不生效 ——
+横向对齐只认 <code>align</code> 属性（v1.0.3 起真正作用到单元格文字），内边距一律走 config 的 <code>tableCellPadding</code>。
+三行都看一眼：</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="6FLspp0RrV91paC7oi0tDZ">
+  <tr data-page-node-id="4Gb6gQcmq1MYDYPAD5k8c1">
+    <td align="left" style="padding:8px;" data-page-node-id="iN8E6dZeyTYwxBjLAlSfGZ">align=left</td>
+    <td align="center" style="padding:8px;" data-page-node-id="sCF3yhvpytDbVmgDWoPQ4W">align=center</td>
+    <td align="right" style="padding:8px;" data-page-node-id="anKYi5Xym1PiubLV7Ctq2V">align=right</td>
+  </tr>
+  <tr data-page-node-id="nr1JTvWgyQOE02D85AkwhI">
+    <td style="text-align:center;color:#FF0000;padding:8px;" data-page-node-id="bLMIk4of7OVFiOQyF3s8mM">style 改红生效、style 居中无效（仍左对齐）</td>
+    <td style="text-align:right;padding:8px;" data-page-node-id="QkyA8AuOBhCJQSFBBKDUAY">style 右对齐（text-align 不生效，仍左对齐）</td>
+    <td style="padding:8px;" data-page-node-id="34ZYix155xBORhLhsQk1bA"><span style="color:#1E6FFF" data-page-node-id="HiXGLc0fcS9gEWYHgCf9Cl">单元格内 span 改色（预期有效）</span></td>
+  </tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="yCgd3f6oD9YZPfHd8iC51K"><strong data-page-node-id="py9oxYoCmpJKKV5FbAImtn">9.5 单元格里的富内容</strong>（加粗/代码/链接/多行/空单元格/长文本混在一起）：</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="rdsqyE1HCZHtcLTHOwyy0i">
+  <tr data-page-node-id="jYbgH36sJeB8MjWHWvphjS">
+    <th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="03fiSrMfA7SSAo130GOwcp">类型</th>
+    <th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="3RzCNyzDNepn8xe6gGpaXT">内容</th>
+  </tr>
+  <tr data-page-node-id="CnxbQCI1HEqSDRjCHewUKS">
+    <td style="padding:8px;" data-page-node-id="pCMCh3ICBWNl6vxqsF1ifv">行内标签</td>
+    <td style="padding:8px;" data-page-node-id="58ljiOxdceGMj3dLlSLv7C"><strong data-page-node-id="pT5jeQHuf6fqvaqVPXSoZq">加粗</strong> + <em data-page-node-id="rSiaeqHaKJCtiaNEHlFfUh">斜体</em> + <code style="font-family:Consolas,monospace;font-size:14px;color:#D6336C;" data-page-node-id="TBASxlWgS6YES06bU8WiiM">code</code> + <a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="NtOPIQAcCxIVkrj6Faipti">链接</a></td>
+  </tr>
+  <tr data-page-node-id="zeIZUrf3UGKyZPlcvdx0l5">
+    <td style="padding:8px;" data-page-node-id="cUwIk9xw8wMie8gACfGTZz">强制换行</td>
+    <td style="padding:8px;" data-page-node-id="OoCHpdFLpA8DPf2t7p56lo">第一行<br  data-page-node-id="8EErevO8A8OUXEBs6NWkTl"/>第二行<br  data-page-node-id="GtGTwJdPRzMGDwBlMjUPGj"/>第三行<br  data-page-node-id="5e8hyQKSHo5fsOnb6WV4rr"/>第四行</td>
+  </tr>
+  <tr data-page-node-id="0BrnNiLayiDB67zMkPdhaC">
+    <td style="padding:8px;" data-page-node-id="Lo3AHhHQha5c2XoU7gwjgN">长文本自动换行</td>
+    <td style="padding:8px;" data-page-node-id="MUKwEfG2dWs6LKUHcxAVjG">这一格塞了很长的一段中文，用来验证单元格内部的自动换行以及同一行其余单元格的高度是否被同步撑高，避免出现行高错乱或内容被裁切的情况。</td>
+  </tr>
+  <tr data-page-node-id="Suvj265owNqj8VPKIth2BE">
+    <td style="padding:8px;" data-page-node-id="nhO6e656tzh5sUSToUznDX">超长无空格串</td>
+    <td style="padding:8px;" data-page-node-id="huJGjSkHUtOcOs2yfKvfBd">https://cdn.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png</td>
+  </tr>
+  <tr data-page-node-id="Fz9hgP5M7N2jCmx6hHmkOs">
+    <td style="padding:8px;" data-page-node-id="aAD7bKtFuQyLBiTHyLULPO">空单元格</td>
+    <td style="padding:8px;" data-page-node-id="tKVYEiidFXHKa4wRSijkmZ"></td>
+  </tr>
+  <tr data-page-node-id="rMTPV3tmKvwJy9ivEKYwPo">
+    <td style="padding:8px;" data-page-node-id="sKQWe6dwGGRl3kanjHLA52">仅一个短字</td>
+    <td style="padding:8px;" data-page-node-id="bRJnWNur53AlrbOUrCip6C">x</td>
+  </tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;"><strong>9.6 宽表（6 列，考验列宽分配与横向滚动）：</strong>6 列 × 默认 80vp 最小列宽 = 480vp，
+超过常见手机的可用宽度（约 360vp），所以这张表应当能<strong>在表格区域内左右滑动</strong>（表头与表体一起横移，整页不跟着横移）；
+列被明确压窄时，单元格里的长文本换行、行高由最高单元格决定，行与行仍应等高。
+把 <code>tableMinColumnWidth</code> 设为 <code>0</code> 则关闭横向滚动、6 列等分可用宽度 —— 哪种都算预期，取决于配置。</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="1v2j125SPipGkpyGaOP6lz">
+  <tr data-page-node-id="UywfXB64TCwAlT8X060U74">
+    <th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="gNtSdSTHnat0bVhFFuNRm9">版本</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="8AaOtmgGmN8cOIaJuYZ4TX">类型</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="ClyDAPlGX5KyAlPXHclVH2">核心改动</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="BmzIBYib06iiOxcYybu0uZ">影响面</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="zgAQjgkLZuHTuBHVJoxQz9">风险</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="bWQcKcCahY2gQgBajdCz5p">状态</th>
+  </tr>
+  <tr data-page-node-id="DiY7EBo1D4atWGKxYak3Fh">
+    <td style="padding:8px;" data-page-node-id="TlfQVsWAtyXefA7OtgCKIV">1.0.0</td><td style="padding:8px;" data-page-node-id="GcjOyEmv2iGI1gGk83DCVz">首个稳定版</td><td style="padding:8px;" data-page-node-id="wniIWnqQkKy6jsDjbmlJk3">手写解析器 + 原生渲染</td><td style="padding:8px;" data-page-node-id="nRcIgtoBB2DLh2ECFtiLM0">全量</td><td style="padding:8px;" data-page-node-id="onDoSDDB0n3HSNd1vPn1Tn">中</td><td style="padding:8px;" data-page-node-id="flGE3JjL5c6mBldeZ5LBnl">已发布</td>
+  </tr>
+  <tr data-page-node-id="zVY1LidwLA8GVEw0jfjX2d">
+    <td style="padding:8px;" data-page-node-id="gplh3ruCsmAFX8SBsKOLVA">1.0.1</td><td style="padding:8px;" data-page-node-id="eIgEo2DHEaYNbUpCaWGdiW">修复</td><td style="padding:8px;" data-page-node-id="nUZxDUGmnP3Nu4MsJ99VdX">大图自适应、预览手势、协议白名单</td><td style="padding:8px;" data-page-node-id="kP3IrmiBjSwrJNVAQQRnll">图片</td><td style="padding:8px;" data-page-node-id="bbEUCbG0hHvsDab1LWo4FS">低</td><td style="padding:8px;" data-page-node-id="6kyNLeCNBuan2SrbiDqzj9">已发布</td>
+  </tr>
+  <tr data-page-node-id="Dpzo7Py1j5wsU6WbY13Tol">
+    <td style="padding:8px;" data-page-node-id="LMHjH7jwFYlXnRAeW4NZiN">1.0.2</td><td style="padding:8px;" data-page-node-id="9jhh6UCEcPsC8ZeCRBmRVS">修复</td><td style="padding:8px;" data-page-node-id="xeYaQVoRJ75M0QmdmXlss3">表格重构、引用块高度、混排换行</td><td style="padding:8px;" data-page-node-id="EFUSWkUsuVk1P7BZQJuF5a">表格/引用</td><td style="padding:8px;" data-page-node-id="odGbysyTgrZYACyWK6CIn4">高</td><td style="padding:8px;" data-page-node-id="TxFTAnz9xUorvcw3py4iHa">已发布</td>
+  </tr>
+  <tr data-page-node-id="2TGD475iFKA7aAtptYVtSx">
+    <td style="padding:8px;" data-page-node-id="bWAKN3OAjAqAsTA2MhO50m">1.1.0</td><td style="padding:8px;" data-page-node-id="Veozokk68yNu4ksAx2F3kg">新增</td><td style="padding:8px;" data-page-node-id="84Nt19KrFiwCAwv2T3bpmf">解析错误回调 + AST 导出</td><td style="padding:8px;" data-page-node-id="ByPc8kjN2ZJzjH3g5mKihp">解析层</td><td style="padding:8px;" data-page-node-id="TffEHxYVe6ic2UrBHWg8pN">中</td><td style="padding:8px;" data-page-node-id="45mkdGU7OR7RPkz2W3oY2U">规划中</td>
+  </tr>
+</table>
+
+<!-- CASE-09a | 表格被 div 包裹：v1.0.2 修复项，整表不能丢 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="EUMAt5hnaigM2CAPejqlrl"><strong data-page-node-id="dqTxKRCA6YgdYUxCKBPkZB">9.7 被 div 包裹的表格</strong>（v1.0.2 修过的点，之前会整表丢失或退化成文本。
+编辑器在表格外面套一层可拖拽容器是常态）：</p>
+<div style="margin-top:10px;margin-bottom:10px;" data-page-node-id="t3xirDvlHZMZKYgWpxPdC7">
+  <table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="tdPoZyYRcGoptSFICZhRXV">
+    <tr data-page-node-id="CWeuv37ENrsJbGyXLnFvIB"><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="E5a0GLoaUgUkMNHDzPV3os">场景</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="PeKESjU7aHOFff2aZEGGHT">修复前</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="5v7TVgkFh5C2te12cKCGmF">修复后</th></tr>
+    <tr data-page-node-id="xra5JYxpldim3hZMp8F0uo"><td style="padding:8px;" data-page-node-id="TweZvEGrc0m8GloLomIOmq">被 div 包裹</td><td style="padding:8px;" data-page-node-id="ylRSuoGp0s0EQWD8EOmXT5">整表丢失</td><td style="padding:8px;" data-page-node-id="EQLEDtAQmiraGwYthaYKaN">正常渲染</td></tr>
+    <tr data-page-node-id="FJV0jCD0RYAeqDf9C8Ca1k"><td style="padding:8px;" data-page-node-id="fLZOXPOiZoF7MsVBjp4XJk">被 tbody 包裹</td><td style="padding:8px;" data-page-node-id="AqMF5kCNyC01PNOQnL8AHy">退化为文本</td><td style="padding:8px;" data-page-node-id="QKm3Yzkm8LB1PFV5TCwgs1">正常渲染</td></tr>
+  </table>
+</div>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="rjRCIXAu0VbGmHx2Dusk30"><strong data-page-node-id="Vw5PDE2R6r98nHImjEH7MI">9.8 引用块里的表格</strong>（引用块内部会再走一遍块级遍历，表格应正常存活）：</p>
+<blockquote style="border-left:3px solid #C9D1D9;padding-left:12px;" data-page-node-id="E8pFgDaogN9pReqKX7WpW2">
+  <table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="3x0WKkUoEUnJk0TZe6ERZJ">
+    <tr data-page-node-id="X1GaHQsY6PmXy54rLnEKha"><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="KHIG4Uh3UDKdrXrS5VWBal">参数</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="avM9UXiEPujW8YEKvOX3X2">默认值</th></tr>
+    <tr data-page-node-id="IGgs9goH7TmABliv9IDU4Q"><td style="padding:8px;" data-page-node-id="y3CWcpIZH55oyuIBaE4B1H">tableMinRowHeight</td><td style="padding:8px;" data-page-node-id="GrJL0D1jC3Cqr20SZcmKQG">0</td></tr>
+    <tr data-page-node-id="L5AB9UqX0yerhPGlSxJl3A"><td style="padding:8px;" data-page-node-id="Nzm0Bl4XueDhVXR50x0ckd">tableHeaderTextWeight</td><td style="padding:8px;" data-page-node-id="WsRwXpuhVKBxEhmAiGwwv8">600</td></tr>
+  </table>
+</blockquote>
+
+<!-- CASE-09b | 单元格内嵌表格：已知降级，行不会被外层表格错误收编 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="BURDBqDnMXHY3mwSrblFft"><strong data-page-node-id="B0exHtRz0LQJtefaYULp51">9.9 单元格里嵌表格</strong>（已知降级）：外层收集行时会在 <code data-page-node-id="QWlUwMBdiNNgYjXHtCr1jE">td</code> 处停止下钻，
+内层表格不会被外层吞掉；内层表格本身按行内文本降级处理。期望：不崩、外层行列数不错乱。</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="UcvgZhQnoXD18UtJYVOJG3">
+  <tr data-page-node-id="s3glnJQSfvDSZfu0TTJ1F3">
+    <th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="1TeRZUMFHMVxLF6j44BdJM">外层表头</th>
+    <th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="GOPRm3nLEEVwc1DpaXNnjM">含内嵌表格的单元格</th>
+  </tr>
+  <tr data-page-node-id="bbP6NtHOE2aeeGN1zHpRri">
+    <td style="padding:8px;" data-page-node-id="5AX77VysRftrKqZL6GX9zR">普通格</td>
+    <td style="padding:8px;" data-page-node-id="zb9KG53UhNC5flaoeBDL0L">
+      <table style="border-collapse:collapse;" border="1" data-page-node-id="vkm6hRoe8gWhqyx5HJKkGt">
+        <tr data-page-node-id="YJxt1JsAez1kYBYZa6qj4F"><td style="padding:8px;" data-page-node-id="dbJC8ZgbhRN2ECeuyY3gL1">内层 A</td><td style="padding:8px;" data-page-node-id="jR50uwJmOvdZ8zoBBKfgb9">内层 B</td></tr>
+      </table>
+      内层表格后面的文字
+    </td>
+  </tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UmzyHUYNhNEJkK96U0Ohw7"><strong data-page-node-id="D2dvYBNVaG5zo4VYTK3L90">9.10 表头样式与斑马纹配置验证</strong>（默认配置下奇偶行同色，即看不出斑马纹；
+把 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="qcIYjEDU9JwPSaOvcxTDZ7">tableOddRowBackground</code> 改成
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="D88S4WPLoTGpTUORybsXK8">#FAFAFA</code> 后，
+下面这张表的第 2、4 行应出现浅灰底。注意单元格里写的 <code data-page-node-id="xGg8gjGa6DmVEQ7WNgb4HJ">background-color</code> 内联样式自 v1.0.3 起<strong>已经生效</strong>：第 1 列的 #FFE58F 浅黄会盖住斑马纹，第 2、3 列才体现斑马纹配置）：</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="N2o8yD1GiWiIuu8bw8ZT1n">
+  <thead data-page-node-id="EZH0oMxDNX73opUxw6FFJR">
+    <tr data-page-node-id="XpxWFyxP0Mj2J3nv7iZLDN"><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="imgD0Nh23XCKUR9vcIVJAi">序号</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="ptocMkmgPqEZ15YGAvhN4P">行类型</th><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="mAfjJXRxp7JTWu33AEDelW">期望背景</th></tr>
+  </thead>
+  <tbody data-page-node-id="EuLDqadaplmY3T6NVP2pF4">
+    <tr data-page-node-id="QUhiwLhWEb44LbicDQ1irN"><td style="background-color:#FFE58F;padding:8px;" data-page-node-id="wjl3TUTeWG0jtv6nBS3EK3">1</td><td style="padding:8px;" data-page-node-id="XroNCNoTCuHnLC1D7pK3i0">表头</td><td style="padding:8px;" data-page-node-id="UroWizZ3jgerLny8WFBEAf">#F5F6F7</td></tr>
+    <tr data-page-node-id="bNF9GbpWm5iOdM21fmGBeC"><td style="background-color:#FFE58F;padding:8px;" data-page-node-id="HDSDOPsl26KG6bOyOo3hHc">2</td><td style="padding:8px;" data-page-node-id="CWISuLyoNslIpY6rJZbl5I">偶数数据行</td><td style="padding:8px;" data-page-node-id="sCqDEQHPYw9UobxHHLSCAZ">tableEvenRowBackground</td></tr>
+    <tr data-page-node-id="qwJCMyD3Dsyf2XjXyDsxuh"><td style="background-color:#FFE58F;padding:8px;" data-page-node-id="2HH6RTMo0MxEZVaqQu6Vva">3</td><td style="padding:8px;" data-page-node-id="Jqu4rHyfYjTEh0t2lI1Cgn">奇数数据行</td><td style="padding:8px;" data-page-node-id="Dygbx105NVk91Q1TH2G3Rx">tableOddRowBackground</td></tr>
+    <tr data-page-node-id="4Htd0LJ6IJegCbAYC8C1vY"><td style="background-color:#FFE58F;padding:8px;" data-page-node-id="VRUjbrM754Q7XqOqNWs4GX">4</td><td style="padding:8px;" data-page-node-id="xMoWIfPqqpCjKtITa0GM8D">偶数数据行</td><td style="padding:8px;" data-page-node-id="Nt7iPo56uVEh0x9WChx2KC">tableEvenRowBackground</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="DdIesp0JAhQNCwHAHAlUs5"><strong data-page-node-id="cFvsQjTBDRFZMOQkbl2B75">9.11 只有表头、没有数据行的表格</strong>（预期：既然存在 <code data-page-node-id="29Iafmfq4fc8tHvXkrJzy3">tr</code> 就会成表，
+应正常渲染出这一行表头，不崩、不变形）：</p>
+<table style="border-collapse:collapse;width:100%;" border="1" data-page-node-id="EEnH0S4kAvtBDZJEXClq46">
+  <tr data-page-node-id="Q014ZvRsfBcxioHrHydam1"><th style="background-color:#F5F6F7;padding:8px;" data-page-node-id="DLa18H07cFSbQE1v19a8lS">只有表头</th></tr>
+</table>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="kxL67H3DHoaE2WYcvKPZTu"><strong data-page-node-id="6NyVydvJLzHCi0y6Jsxuua">9.12 完全没有行的表格</strong>（预期：整块不渲染，不留空白——判据是与上下两段之间没有多余空隙。
+编辑器删空表格内容后常常残留这种空壳）：</p>
+<table style="border-collapse:collapse;width:100%;" data-page-node-id="aBwoPCflYSX2M1R6gvkiom"></table>
+<table style="border-collapse:collapse;width:100%;" data-page-node-id="1sdYT1oAdCY7BAcWeBEUlc">
+  <tbody data-page-node-id="X7YlxOKYtq3xpnSueBmLrJ"></tbody>
+</table>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;">九·附：背景色专项（v1.0.3 新增）</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;">这一组专门核对 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;">background-color</code>
+的五种落点。v1.0.2 及更早版本会把它们<strong>全部丢掉</strong>（页面上一点底色都看不到），
+所以判据很简单：下面每一处都应该看得到颜色，且"块级铺满、行内只覆盖文字"。</p>
+
+<!-- CASE-14a | 块级：段落底色整段铺满，且不污染子 span -->
+<p style="font-size:16px;line-height:1.7;background-color:#FFF3CD;padding:8px;">14a 块级底色：<span style="background-color:#D0EBFF;">这段 span 自带蓝底，只应覆盖这几个字</span>，
+而段落自己的浅黄底应从最左边一直铺到最右边——<strong>包括这一行右侧到屏幕边缘的留白</strong>。
+段落里没有被 span 覆盖的文字，底色来自段落本身，而不是各自带一条。</p>
+
+<!-- CASE-14b | 行内：mark 默认高亮、自定义 span、加粗带底、行内 code -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;"><mark>mark 默认浅黄底</mark>、<span style="background-color:#FFE58F;">span 写的浅黄底</span>、
+<mark style="background-color:#D0EBFF;">mark 被覆盖成蓝底</mark>、<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;background-color:#F3F4F6;">行内 code 的灰底</code>、
+<strong style="background-color:#FFD8A8;">加粗 + 橙底</strong>。
+五种行内底色都应<strong>只覆盖各自那几个字</strong>，不应连成一片，也不应把整行铺满。</p>
+
+<!-- CASE-14c | 单元格：td/th 自身底色优先于表头底色与斑马纹 -->
+<table style="border-collapse:collapse;width:100%;" border="1">
+  <tr><th style="background-color:#D0EBFF;padding:8px;">表头（写了蓝底）</th><th style="background-color:#F5F6F7;padding:8px;">表头（默认灰底）</th></tr>
+  <tr><td style="background-color:#FFE58F;padding:8px;">单元格写了黄底</td><td style="padding:8px;">没写背景 → 走斑马纹</td></tr>
+  <tr><td style="padding:8px;">没写背景 → 走斑马纹</td><td style="background-color:#D3F9D8;padding:8px;">单元格写了绿底</td></tr>
+</table>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;">判据：左上角表头是<strong>蓝色</strong>（不是默认的 #F5F6F7），
+"单元格写了黄底"那格是浅黄、"单元格写了绿底"那格是浅绿，其余格子按 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">tableEvenRowBackground</code> / <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">tableOddRowBackground</code> 决定。</p>
+
+<!-- CASE-14d | pre：背景内联优先、config 兜底 -->
+<pre data-language="json" style="background-color:#0D1117;border-radius:8px;padding:12px;">{ "theme": "dark", "note": "内联背景应生效，这里是深色底而非 config 的浅灰底" }</pre>
+<pre data-language="bash" style="border-radius:8px;padding:12px;">echo "这段没有内联背景，应回落到 config 的 codeBlockBackground（浅灰底）"</pre>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;">第一条代码块是<strong>深色底</strong>（说明内联背景赢了 config），
+第二条是<strong>浅灰底</strong>（说明没写内联时 config 兜住了）。注意深色底那条的文字色仍由 config / 高亮主题决定，
+可能偏暗、对比度不足，属本版已知行为。</p>
+
+<!-- CASE-14e | blockquote：背景内联优先、config 兜底，内部文本不被染色 -->
+<blockquote style="background-color:#FFF0F6;border-left:3px solid #C9D1D9;padding:12px;">
+  <p style="font-size:16px;line-height:1.7;">这层引用块写了粉色内联背景 → 应当显示<strong>粉色</strong>，而不是 config 的 #F7F8FA；
+  并且这一整块的粉色要铺满，内部段落背后不应再出现"每段一条"的碎色块。</p>
+</blockquote>
+<blockquote style="border-left:3px solid #C9D1D9;padding:12px;">
+  <p style="font-size:16px;line-height:1.7;">这层引用块没有写内联背景 → 回落到 config.quoteBackground（#F7F8FA），左右两侧与文字之间是一个完整底色。</p>
+</blockquote>
+
+<!-- CASE-14f | 容器包裹：div/article 里的块级子元素，内联样式必须照样生效 -->
+<div style="background-color:#EEF3FF;padding:8px;">
+  <p style="font-size:17px;color:#1E6FFF;">14f 容器包裹：这一段被 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">div</code> 包着，
+  字号 17 与蓝色必须照样生效。v1.0.2 及更早版本里，只要正文被容器包一层，
+  内部块级元素的<strong>全部内联样式都会失效</strong>——后台模板常见的
+  <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;">&lt;div&gt;</code> 结构会直接中招。</p>
+  <p style="background-color:#D3F9D8;margin-bottom:0px;">这一段写了浅绿底色，同样应生效。
+  另外注意：我上面的外层 div 是淡蓝底，它会<strong>下放给没自带底色的子块</strong>（所以上一段是淡蓝底）；
+  而这一段有自己的浅绿底，就用自己的。扁平渲染模型下容器本身没有独立节点，
+  两段之间的间距区域不会有淡蓝底，这是已知降级。</p>
+</div>
+
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="bjmPJL89daeHdqQ2fI4WLi">十、HTML 实体与编码：别让 emoji 变成方块</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="4ScBeUdhFFHinCxyuVHNjE">这一节全部是编码问题，配合 utf8mb4 一起看。编辑器把 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="1YYCAV5yHsy8NzzOpHy0IY">&amp;</code>
+转义成 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="ZR74szrRUiSZpq02dmdYwu">&amp;amp;</code> 是常规操作，
+所以实体解码这条链路一定要通。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="WUTa3fGK3GjN6PGE5xUQ0U"><strong data-page-node-id="JDrEEBX1WLMcAJOEGjwMEB">命名实体：</strong>&amp; &lt; &gt; &apos; &quot; &nbsp; &copy; &reg; &trade; &hellip; &mdash; &ndash;
+&laquo; &raquo; &middot; &bull; &times; &divide; &yen; &euro; &deg; &plusmn; &micro;
+&sup2; &sup3; &frac12; &frac14; &lsquo; &rsquo; &ldquo; &rdquo; &prime; &sect; &para;
+&cent; &pound; &sum; &radic; &infin; &le; &ge; &ne; &asymp; &pi;（末尾五项依次是 ≤ ≥ ≠ ≈ π，
+若未替换会在这里看到 &amp;le; 这样的原始写法）</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="MvfIFmDsvMD20QXzHuOt31"><strong data-page-node-id="Wegwf0YAe6xP1uM3eiiYWI">数字实体（十进制）：</strong>&#39; &#34; &#169; &#20013; &#25991; &#22909; &#128512;
+这一行依次是单引号、双引号、©、中、文、好、😀——少一个都会在这里露出破绽。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="iNOVppWmkKqHW9vSlsBBvY"><strong data-page-node-id="LKW3jWxpX16dCnjoJya6a2">数字实体（十六进制）：</strong>&#x27; &#x4E2D; &#x6587; &#x20BB7;（生僻字：𠮷，4 字节 UTF-8）&#x1F600;（😀）&#x1F680;（🚀）</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="4mEwUsq4GOWgM5HGNfU1AJ"><strong data-page-node-id="8tsU6GtXG64c1KikDeexHk">未收录实体原样保留：</strong>&alpha; &beta; &gamma; &omega; &unknown;（这四个组件未收录，期望原样输出，不变成空）。
+无分号写法：&nbsp &copy（缺少分号，正则不匹配，期望原样输出）。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="hXoe9Q19YD0MkDYm26F6Dl"><strong data-page-node-id="15feSp38sTQMjkUqlE0AJu">换行实体与制表实体（预期存在差异，不算 bug）：</strong>换行实体 →
+<code style="font-family:Consolas,monospace;font-size:15px;" data-page-node-id="9EvOx6CTyjwDQyL9btIPPE">&#10;</code>，制表实体 →
+<code style="font-family:Consolas,monospace;font-size:15px;" data-page-node-id="ZY55rsEWWBFxeLKcw1GRUr">&#9;</code>。
+若组件把它们解码成真实的换行与缩进、而浏览器把它们折叠成一个空格，这属于两边排版模型的固有差异，记录下来即可。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="ncSsoLRYWZc9vVCJQborBP"><strong data-page-node-id="UdHtyYa5sYQISfzFUmvGvP">直接写入的字符：</strong>emoji 😀🚀🎉👍、全角标点：，。；：？！""''（）【】《》、破折号——省略号……
+数学符号：±×÷≈≠≤≥∑∏√∞、箭头 → ← ↑ ↓ ⇒、货币 ¥ $ € £ ₩、形近字符 O0oO·Il1|、易混淆空格：
+普通空格|&nbsp;|全角空格(　)|（第二种是 &amp;nbsp; 不换行空格、第三种是 U+3000 全角空格，
+三种宽度应当肉眼可分）。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UGiy7cqFlF8jMgyAYKhI7p"><strong data-page-node-id="OGZmiyjlgDMGWSs48HEP3X">中文编码边界：</strong>起始字符（U+4E00）一、末尾字符（U+9FFF）鿿、扩展 A 区（U+3400）㐀、
+代理对边界（U+FFFD）�、零宽连接符（U+200D）与变体选择符（U+FE0F）组合：👨‍👩‍👧‍👦（一个家庭 emoji，
+由多个码点加 ZWJ 组成）——这一项最容易在入库阶段被截断。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="dp3XAPZLgn0KAr1gJOzTGz">十一、容错：喂给它一堆脏 HTML</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="sJhJDAC3CqSjttQuBd1Z6S">后台编辑器、手工粘贴、爬虫抓取，什么脏 HTML 都会遇到。下面这些写法都不规范，
+期望结果只有一条：<strong data-page-node-id="xH9DlhxJmDOirEGlo2cA69">不抛异常、不闪退、能渲染多少渲染多少</strong>。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="nlhFxY28BbdmHetOHn7f9x"><STRONG style="color:#008000;" data-page-node-id="3xlMUURDH8Vobx9bpxKsYu">大写标签强转小写</STRONG>、<EM data-page-node-id="9B5A7Z0HF12sUFYrNEdeVw">大写 EM</EM>、<U data-page-node-id="NXAcYG4KP84KKM85ZRA0p0">大写 U</U>、
+<A HREF="https://www.harmonyos.com" data-page-node-id="5W4HHlLxnHKuWOaC2RKA9H">大写 A 带大写属性</A>、<P style="color:#008000;" data-page-node-id="7glwMLlw0mAoSd7AxWyLa0">大写 P 段落，内联样式也应照常解析</P>。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="qEIwa7mApFH0e1L3rCrjSv">属性三种引号写法：<a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="hKdtIDUsYmvYHI2837b85M">双引号</a>、
+<a href='https://www.harmonyos.com' style="color:#1E6FFF;" data-page-node-id="V6BdHn6EZF8I7z0mW0nEnU">单引号</a>、
+<a href=https://www.harmonyos.com style="color:#1E6FFF;" data-page-node-id="7OLxSaCWKDdddDKjGNjMDT">无引号</a>、<b data-note data-page-node-id="rHd0ZBQG14mhuiKFFuJJuy">裸属性</b>、
+<img src="https://picsum.photos/seed/rt-attr/100/60" alt=无引号alt width=100 height=60 data-page-node-id="RP5t2PIsrtoDBoKUleHkYT" />。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="r2AIK2NsyRMepP1SbLw6bO">自闭合与 void 标签：<br data-page-node-id="RuaAS2S8v61CC8PAHXkvYS"/>换行自闭合、<br data-page-node-id="xh2s0Mhk5d3TSoJtALbJ3s">换行不闭合、<hr data-page-node-id="EuQEqlVsDdMQsZkimdGu2R"/>、<hr data-page-node-id="XbUxKWmuIbkGhHwIR5w5gN">、
+图片自闭合 <img src="https://picsum.photos/seed/rt-self/120/60" alt="自闭合图" style="width:120px;height:60px;" data-page-node-id="8YK2ObN25ak0hQYlREN1kB" />。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UvjTtDvOcUNR8FJIBvJsMx">文本里出现尖括号：3 &lt; 5 且 7 &gt; 2，以及没转义的 3 < 5 ——
+第二个"小于号"后面跟的是空格与数字，不是合法标签名，组件应按普通字符输出，不能把它后面的内容当标签吞掉。</p>
+
+<!-- CASE-11a | 多余闭合标签：开始标签不存在，闭合标签应被安静忽略 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="k4jdlDMgwHiNgOVlWulK3G">下面这一行是五个"凭空多出来的闭合标签"，它们对应的开始标签根本不存在：</p>
+</strong></em></td></div></p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="IHYq7LUwjLHR85LJtoAluQ">上一行那五个孤立闭合标签应当被全部忽略：本段文字必须完整显示，
+并且不能被并进上一段——如果本段消失或与上一段合并成一行，说明闭合标签的容错逻辑有问题。</p>
+
+<!-- CASE-11b | Word 粘贴痕迹：后台最高频的脏 HTML 来源 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="OwdsGomEkp16Vdp4ot8Y2w">Word 粘贴的痕迹（后台最真实的脏 HTML 来源）：<o:p data-page-node-id="tazcu8pAgY39NAFEPk4fd9"></o:p></o>
+这一段在 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="pWKdZVAfdh6cJhN66XnvAY">&lt;o:p&gt;&lt;/o:p&gt;</code> 之后。
+注意上面那个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="SvQOzbqd4LpOPhPobrsXyz">&lt;/o&gt;</code> 是复位标签——
+<code data-page-node-id="B1VzaKm6XYfr4nTGLXTqWd">&lt;o:p&gt;</code> 被标签名正则截断成了 <code data-page-node-id="aaA6BimmSUmeLumztYPTyB">o</code>，而 <code data-page-node-id="VfFoNfG73bAEKET2HrGpi2">&lt;/o:p&gt;</code>
+切出来是 <code data-page-node-id="rHtiC2yMHTGKzVLBo0J1HF">o:p</code>，对不上，所以必须用 <code data-page-node-id="adpATgjLqoYQtsyAuYgCuh">&lt;/o&gt;</code> 才能闭合（详见案例 E7）。
+本段文字必须完整显示。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;mso-bidi-font-weight:normal;layout-grid-mode:char;text-justify:inter-ideograph;" data-page-node-id="YB21diPW4GwByWWq3EK1kd">再补一条 Word 风格的样式：
+<code style="MARGIN:0cm 0cm 0pt;COLOR:#333333;" data-page-node-id="sN526fL6oRUfFqH1VNIeYL">mso-bidi-font-weight:normal;layout-grid-mode:char;text-justify:inter-ideograph</code>，
+以及大写属性名 <code style="MARGIN:0cm 0cm 0pt;COLOR:#333333;" data-page-node-id="9NHTDmObWa4GtKFVd7k8un">MARGIN:0cm 0cm 0pt;COLOR:#333333</code>。
+期望：属性名统一转小写，<code data-page-node-id="g4B5YZmz0sjUCpI1s1R7fm">COLOR</code> 生效（所以上一段文字应是这个 #333333，
+和别处相比略有差异但不明显），而 <code data-page-node-id="3KWzLdQLqe9uyYjCqum0u9">MARGIN</code>/<code data-page-node-id="DxvbWyD7Z1dWBmC80ZaTBZ">text-justify</code> 这类不支持的属性被安静忽略。</p>
+
+<!-- CASE-11c | script/style/注释/DOCTYPE/template 内容必须不可见 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UFpxxjrauzd4Osaaqlm9nA">下面这段里 <script>var injected=1;/* 脚本内容不应被渲染 */</script> 中间是脚本，
+<style>.injected{color:red}</style> 中间是样式，<!-- 这整段是注释，不该出现在页面上 -->
+以及 <template data-page-node-id="g3fk3CK4NVxNXGTpeZOnRA"><b data-page-node-id="yOjAnqVDYCtHq910EHutdX">模板内文字也不该出现</b></template> 和 <noscript data-page-node-id="7Tu3dhzd6btqWkko0vJ9Hh">noscript 内容也不该出现</noscript>，
+以上内容全部不可见，本句前后的文字要完整。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UJwJtSqQLW45c4LHjakHaN">空标签与仅空白的标签（编辑器产生的空段落就是这种）：</p>
+<p style="font-size:16px;line-height:1.7;" data-page-node-id="8mrdn0T8TGUOpzRucufSHN"></p>
+<p style="font-size:16px;line-height:1.7;" data-page-node-id="873ZPUzawibuqDumc5c8Xz"> </p>
+<p style="font-size:16px;line-height:1.7;" data-page-node-id="Qe8bWEeZ9U3zIAb4j1UXVZ"><br  data-page-node-id="Dfy8fWjUi6CVn5SwU8BI56"/></p>
+<p style="font-size:16px;line-height:1.7;" data-page-node-id="c0cwC5N1HPtijU4nUE83bc"><br data-page-node-id="fQ9MXrRIF042jfZIRwiIEm"/></p>
+<div style="margin:0px;" data-page-node-id="E4hvN1OjbdBQvbmpv0u3SI"></div>
+<span data-page-node-id="FTb37mVwy4L6xJwvndBry6"></span>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="iqljz4pMBkhUUsr2D1f9XP">上面连续几个空标签不应产生可见的空行堆叠，也不应报错。
+其中两个是编辑器最爱的 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="zmhjp31di3vRLgfZwkJ3Rl">&lt;p&gt;&lt;br/&gt;&lt;/p&gt;</code> 空行写法。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="GmtNXJe8DmBkNw7HHrXabr">还有一种常见写法是"隐式闭合段落"：<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="EE56OQZQ5JdjnvaXY5vwk1">&lt;p&gt;A&lt;p&gt;B</code>，
+浏览器认为第二个 <code data-page-node-id="XiVpriD4efQPxHjyuKYuHD">&lt;p&gt;</code> 会自动关掉第一个。本组件的解析器没有实现这条隐式闭合规则，
+会把第二个 p 嵌进第一个里面，并一直向后吞并直到遇到够数量的 <code data-page-node-id="xfQOBhnE1Lm0WHKC52xfIS">&lt;/p&gt;</code>。
+因为这种写法会改变后续内容的归属、干扰本文其余章节的判读，所以挪到了文末《附：极端容错样本》里单独测试。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="rRqkZUAnGbAcbEtHTo3adX">十二、混排与换行：text + br + a + img 的顶对齐</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="h8s7tyKQaRbdwZkasWqlB2">v1.0.2 修过一个很隐蔽的错位：同一段里"多行文本"与"单行链接"放在同一个 Flex 里时，
+链接会被顶到上一行。修复方式是按视觉行拆开、逐行独立布局。下面集中复现这几种组合。</p>
+
+<!-- CASE-12a | 文本 + br + 链接：链接必须留在自己那一行，不上浮 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="GDNj0cMjoAFTMrxrYx2AqT">第一行是普通文本，<br  data-page-node-id="ja3NFIrchBYQh86PKXQ7Nq"/>第二行是跟上来的文本，<a href="https://www.harmonyos.com" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="nvu74lDUuOZIYBccLDpqtB">第三行是链接</a></p>
+
+<!-- CASE-12b | 文本 + br + 图片 + 链接 混合 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="JStoQiGOyXyvthYQdWM9Lj">文本第一行<br  data-page-node-id="FP7d3Hth48Elm2L8ziDBif"/>文本第二行<img src="https://picsum.photos/seed/rt-mix/100/60" alt="混排图" style="width:100px;height:60px;" data-page-node-id="bOXAbpCFCDXqpljg9LmEQq" /><a href="https://www.harmonyos.com" style="color:#1E6FFF;" data-page-node-id="eUR4ECGuVDrgRpFSkxXhns">这段是链接</a><br  data-page-node-id="yHueY1u0d2zadQtyT9WlU0"/>文本第三行</p>
+
+<!-- CASE-12c | 连续 br 制造空行 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="KTxygsdHG5jew1NTk7iPxS">第一行<br  data-page-node-id="B51DAGlxFHJxnZ0ow41CFE"/><br  data-page-node-id="2bCw0Dx7J9I7K7mFEAMBmP"/>第三行（中间应有一个空行的高度，不能塌陷）</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="6Brqib8RHCodDlxQxJgkDC">第一行<br  data-page-node-id="lD80jCJYAmDxKKKz7WcSrR"/><br  data-page-node-id="kB8TAZ4Bx4171hGWzGYEeL"/><br  data-page-node-id="E4cZlpdrj1HtuZjr9CLeyr"/>第四行（中间应有两个空行的高度）</p>
+
+<!-- CASE-12d | 段首/段尾 br、br 开头结尾 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="JNmKC4aZuOKUTdbjoCbpVJ"><br  data-page-node-id="wbeuQZN85MlGZhnLSVQNnn"/>本段以一个 br 开头，期望顶部不要多出一整行空白（或与浏览器表现一致即可）。</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="A3E6SdxsYbjORUPGEFEkqu">本段以一个 br 结尾。<br  data-page-node-id="UOWRIXKLaKPZdnHCeSGoKs"/></p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="haXMIHp0kJxynAXcfBzsdq"><br  data-page-node-id="rpNgJATBjuTu6DnFVQT1nG"/></p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="7zVR9ckKCDhZ4CX0PkaDNp">上一个段落只有一个 br，期望高度很小。</p>
+
+<!-- CASE-12e | 超长无空格串的折行 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="XiWrqCGCnSkrc8niYGI3S4">超长英文单词：pneumonoultramicroscopicsilicovolcanoconiosis；
+更极端的一串：abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz；
+超长 URL：https://www.example.com/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z?a=1&amp;b=2；
+超长数字串：12345678901234567890123456789012345678901234567890。
+期望：不横向溢出屏幕、不闪退；是否折行、在哪里折行，记录下来与浏览器对比即可。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="rPpJ3xYZ6nNJjz88vPUDEw">中英文混排与标点：这是 Chinese 与 English 混排 mixed inline text（含括号）、
+「引号」与"双引号"、数字 123 与 456.78、以及 % 和 ‰ 和 °C，
+期望换行时标点不跑到行首（允许做不到，记录即可）。</p>
+
+<!-- CASE-12f | nbsp 做缩进 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="b0i7rW9gkqkcM6S7Uo4xFH">&nbsp;&nbsp;&nbsp;&nbsp;用四个 &amp;nbsp; 做段首缩进，期望看到缩进（nbsp 是不换行空格，不会被合并成普通空格）。
+这也是编辑器代替 text-indent 的常见做法，值得和前面那条 text-indent 对照看。</p>
+
+<!-- CASE-12g | 块级标签出现在段落内部 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="kzN3d2QIn9MLYQAMWIxLSU">这一段里面塞了一个块级标签：<div style="margin:0px;" data-page-node-id="Y0QTxobnDaakAdvPNYmBWf">我是嵌在 p 里的 div，期望被拆成独立的一段，而不是和上一句挤在同一行。</div>这一句在 div 之后，期望另起一段。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="pJrNsFgicDO9Edox2xW01x">十三、容器标签与未知标签的降级</h2>
+
+<section style="margin:0px;" data-page-node-id="MqCOD0wFL11MBANEDiNEjT">
+  <h3 style="font-size:19px;font-weight:700;color:#1A1A1A;" data-page-node-id="mr2WJF0TvPJTWYEIX5yTfV">13.1 section / header / footer / nav / main / aside / address</h3>
+  <header data-page-node-id="K4ywBnxDs0hlDvFUptHDyQ"><p style="font-size:16px;line-height:1.7;" data-page-node-id="ADrkYDnzcTZSw7hqTDdtin">header 里的段落</p></header>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="outLHLjOdMA6AnsjPqbNHh">section 里的普通段落</p>
+  <footer data-page-node-id="HXFShHImfNMUQDUHrBSv9u"><p style="font-size:16px;line-height:1.7;" data-page-node-id="GFTVLLnQPlnqHN2A4qot6e">footer 里的段落</p></footer>
+  <address style="font-style:normal;" data-page-node-id="xdJlpr7T5bPeYuLf2FMxSr">address 里的联系信息：Room 101, Building B（内联 font-style:normal 应把 address 默认的斜体压回正常）</address>
+</section>
+
+<center data-page-node-id="nuhG3tjjEYyvZFjhEoN9DT"><p style="font-size:16px;line-height:1.7;" data-page-node-id="Azh1nDzvQqkTJRGl1Sqgda">center 标签内的段落（组件把 align 忽略，期望保持左对齐，不报错）</p></center>
+
+<details style="margin-top:10px;margin-bottom:10px;" data-page-node-id="1ZWisVG6q3jEhX28O6pPmm">
+  <summary style="font-weight:700;" data-page-node-id="6VMAo4Sa57WR37c46fpFhR">details + summary（组件不实现折叠交互，期望内容直接展开显示）</summary>
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="1xb7O2rnFnKH4lzPS4M5nb">这里是被折叠的内容，期望它直接可见。</p>
+</details>
+
+<form data-page-node-id="JKUqHpHZVBCZIGTyBl5mil"><p style="font-size:16px;line-height:1.7;" data-page-node-id="3ZlzMC9K30B8AHUIGZRq2d">form 内的文字（组件不提交表单，只渲染文字）</p></form>
+
+<!-- CASE-13a | 完全未知的标签：能渲染多少渲染多少 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="oMpPON1pGPetXjmdFCnuDo">自定义标签：<foobar data-page-node-id="ajNaUSSe6ii6D06erGALSy">标签名不认识时，期望里面的文字仍然显示</foobar>；
+<video data-page-node-id="g2UzcATNPZR5AFFb8LApxu">video 的兜底文字</video>；
+<iframe src="about:blank" data-page-node-id="ij7AVyWd6cuRdjDT5vHRof">iframe 内容在原生组件里不会加载，只留兜底文字</iframe>；
+<svg width="20" height="20" data-page-node-id="xY4gIdaIK661GquBljRofU"><circle cx="10" cy="10" r="8" data-page-node-id="rjRPRLmSBTVTg9JYZUVM3H" /></svg>（svg 无文字，期望不渲染或渲染为空，不留大块空白）</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="hZdLzEyuwytlSCuVRWdPSF">注意：上面用的是<strong data-page-node-id="q9AEkO0SAibVstxAtqANjd">不含连字符、不含冒号</strong>的自定义标签。
+含连字符（<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="Gh3cJLiToGFRQNHACCSyX3">&lt;my-widget&gt;</code>）或含冒号
+（<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="9O4iUD2TDzFtua0nTo1lWp">&lt;o:p&gt;</code>）的写法
+会命中一个解析器缺陷，后果比较严重，所以单独放到文末《附：极端容错样本》的案例 E5、E7 里测试——
+这两个是本次核对用逻辑层跑出来、需要修的点。</p>
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="fUTypCkrwL0qeluOBBs1cQ">十四、长文压力测试</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="qBz4Ppa0oJVRrzIA2BzaSl">这一节的目的是把整篇的节点数量拉上去，看解析耗时、滚动流畅度、长列表内存占用。
+下面这几段是正常长度的资讯段落：</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="QSpKOInde1ALoj3ycHbqJk">解析器的核心是一个逐字符推进的游标。它按 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="dYHQwcA8pBYahGQwKdWACn">&lt;</code>
+切分文本与标签：文本段做实体解码后合并进相邻文本节点，注释、DOCTYPE、处理指令整段跳过，
+闭合标签与当前递归层的目标标签匹配就返回、否则忽略，开始标签解析完属性后决定是入栈递归还是直接作为 void 元素挂上父节点。
+整个过程不依赖正则回溯，也不需要构建完整的 DOM 树，因此在移动端能保持很低的开销。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="fpjpXRgLJaRCI7L379sa28">渲染层刻意避免了"一个块一个组件"的递归结构。所有内容先被摊平成扁平的
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="fFCeFmoz5DxAPVot0Ws11K">RenderBlock[]</code>，
+连续的行内内容合并成一个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="RBy1Iug4481prF3B8m6cSk">Text</code>
+（内部多个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="V4ntaubdufzFOE5XrNPjE1">Span</code>），
+这样做的代价是样式表达力受限——Span 放不下图片、也没有点击事件——
+但换来的是整段文字的自然换行：英文单词不会被拦腰截断，中文也不会莫名其妙多出一个字的空间。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="a4liC7WRPTFWmEpOVUcgAu">图片、链接这两个"必须能交互"的元素被单独抽成
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="rP7DafPJRNyjah2HxtqVyp">InlineGroup</code>，
+在组件层与文本用 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="gz4g1AUOap75GBT1zkhICh">Flex</code> +
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="bMlp8qGIvEsJ4D30kyO3zs">FlexWrap.Wrap</code> 混排。
+这里踩过的坑是"视觉行"的对齐：多行文本与单行链接同处一个 Flex 时，行高最大的那一项会把同排的所有项按基线拉齐，
+于是单行链接被顶到了上一行的位置。最终的解法是在构建阶段就按 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="Z9ePQiO4iVjvK7MebSoPBs">\n</code>
+把行内组切成视觉行，每一行单独一个 Flex。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="wuBjnmXqs2ZFw42ZNh0ZNc">表格是最后攻克的。ArkUI 的 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="mmGbMOMWtQcLHE0N2B9AeZ">Grid</code>
+在只给 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="1dD3jg9LhJknhk1jbGe6S9">columnsTemplate</code> 的情况下表现正常，
+但一旦同时给 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="GKNtIBZqeMyaTRD3Dj8TN0">rowsTemplate</code>
+指定固定行列模式，实测只能渲染出第一行；另一方面单元格内容长度不一致时，行高测量会失真。
+最后的方案是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="OiqKQYW6yGOmA5kOiQFAuq">GridItem</code>
+内层再包一个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="SLS1TSpjxDrYYIU9abjAjD">Column</code>，用
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="Tybci3O0GLoMmJmvBCAjOH">onAreaChange</code> 与双重
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="KN8zppUI196GogNW9Wo0DR">minHeight</code> 把同一行的所有单元格拉到等高。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="5IPR04FG4xAKWwrgTqPa3s">性能层面的取舍：解析与样式级联都在纯逻辑层完成，不碰 UI 线程的重活；
+代码高亮在构建阶段一次性算成 token，渲染时零计算；图片点击的全屏预览用独立的
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="pvlPiZ5OHSCvwS59gXTYmN">Swiper</code> 弹层，
+避免在长文里挂载大图节点导致的滚动卡顿。这些设计在千级节点的文章里表现稳定，
+但真正的考验还是长表格与大量图片的混合场景——也就是你现在手里这篇文档。</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="cLYwcnLv3In3Qpz6E8yVmk">结束语：兼容性测试最怕的不是崩溃，而是"看起来正常但某一处悄悄变形"。
+所以这篇文章的每一节都尽量配一个能一眼看出问题的形式——全量对照、边界值、脏数据、极端长度。
+如果哪一节在设备上的渲染和浏览器不一致，那一节就值得单独开一个 issue。</p>
+
+<hr style="border:0px;border-top:1px solid #E5E6EB;margin:16px 0px;" data-page-node-id="BXY5A8WGZU8FbTQs5cSJgc" />
+
+<h2 style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:18px;margin-bottom:8px;" data-page-node-id="pNBfGjkKGXBuaO3Ch07ZlW">附录：用例清单</h2>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;">下表本身就是最后一个测试对象（八十多行，专治行高测量与长表格滚动）。
+它同时充当验收清单：在设备上逐条核对"期望表现"，不相符的记到"实测"列里。<br>
+这张表也是<strong>表头固定</strong>的验证对象：把 <code>RichTextConfig.tableMaxHeight</code> 设成
+<code>400</code>（或 60% 屏高）后，表体应当<strong>在表格内部独立纵向滚动</strong>、表头行始终可见；
+保持默认 <code>0</code> 时表格随页面一起滚动，表头自然随页面滚出屏幕 —— 两种都算预期。</p>
+
+<table style="border-collapse:collapse;width:100%;" border="1" cellpadding="0" cellspacing="0" data-page-node-id="vY5HHmPVzzWKIZSDmzB9Mt">
+  <thead data-page-node-id="5DL3lZeRrm8PkMniPHW8Um">
+    <tr data-page-node-id="luEeaqhQrDvG16Mg0GZk5M">
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="4Zj3xKcKus0JTh8UKiqonR">编号</th>
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="dcQRTWgPvWIPbcDnw3qu3A">覆盖点</th>
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="ADk4Gpklansftq3MHUWBDI">期望表现</th>
+      <th style="background-color:#F5F6F7;font-weight:600;padding:8px;" data-page-node-id="M6gWa5g7Bp21FgEBS7pX0W">实测</th>
+    </tr>
+  </thead>
+  <tbody data-page-node-id="sqWVqEflpcz5jhZCjGM7oo">
+    <tr data-page-node-id="SP0rLCCo7OjzDiRz1TLYkd"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5oXOj44BP3Qwc2NwKAEjml">01</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZBAwdK8ePgyktiwFnrHo6r">h1~h6 六级标题</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Hn99PqLBMfwr48Rb6JOYbG">字号/字重递减，不与正文混色</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="heDfA26F1G6QZYbSW0QZom"></td></tr>
+    <tr data-page-node-id="0PkSLW86Mpjv693hM4CmDk"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="XF87kCCflOOdCcbX9jDH7f">02</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ylvEdZrVQgFqgUfyKytRPu">标题内行内标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1NSZG1HzgZ36wgeDkLUywh">加粗/代码在标题里仍生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="eklCCg0VAMaGhq0HeFQz26"></td></tr>
+    <tr data-page-node-id="s7kER9q1vPYtsd1dg4KOHq"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="EPG1gzatJnoi8BuJjXYYsF">03</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cXdMMs8PkbidJEUTO5B9uM">标题的内联 style 覆盖</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="SrDd5FjLS9tYGRBorMvyI3">改色生效、text-align 居中生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="MSUP5FkrGW8xfIDhcdRkIJ"></td></tr>
+    <tr data-page-node-id="VB2WQFtcivgkfq5f8DapQj"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="VxQbwHPgLatbTzje1WNzTW">04</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="0KQ9fslMQJ4B7MYRHrJMvQ">标题的 align 属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="77skv3uyq5sEgtgdZpjf3J">不生效，保持左对齐</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="m3ACpmweT5mCPaYoPDVyrC"></td></tr>
+    <tr data-page-node-id="guMWLCri47knDrJgzEPPE7"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Fg1OXiReyniuiewqylb5SC">05</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YdQEvhLLRBGJVAGvHHqr2t">20+ 行内标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="53bOmtMOqXaLUWPmEOOUhq">加粗/斜体/下划线/删除线/上下标/等宽各就各位</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1P83ykGrcqsa9pX9cmRf74"></td></tr>
+    <tr data-page-node-id="zUEYDFOkFoaatL5Mju4CMo"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uLkibd0MR5VEtcNgB3ga6r">06</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="NB0fOEDzNKjeSXMWkdrHac">font 标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jZ8Iqs228OKB6iDJWrlEwv">属性忽略、文字保留</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="voeFJY3J41NI5QN3xAAfXz"></td></tr>
+    <tr data-page-node-id="A98p7WVauOJgMmBXlH8lGw"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="hFV9eFAKHH9yyecn2qYAN9">07</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="b7lgp0McuAq6W4UjOjE1LJ">内联 style 基础属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="GPIGxHnvkmTqEPMo4BGwCk">色/字号/字重/行高/字距/对齐生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YMHSWwUKXgCzFCT0joMi0l"></td></tr>
+    <tr data-page-node-id="GMrrNvaTGR0PiJ6VEeKp8a"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1wKPTym78vOey6h2QCk4CR">08</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="bqxA0mJwUx3qT8BNhlnMAN">编辑器高频属性（重点）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="83NtZ01c4WZE7xRFwAgwZY">text-indent / margin 简写 / padding 简写 均无效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="U4PdvgWm0EopbbZwQiz2dK"></td></tr>
+    <tr data-page-node-id="JBTXDRjJdPZH5SmjkC3znw"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="6ZxCKhX9QaYY5meP5M3kGt">09</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="OTVjO0mXwz9Twnr0QaMkfZ">受支持的长写属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="PugxgAVn07VP22qrU7lUki">margin-top/bottom、padding-left/right 生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="xfqErKZPL53vibeX8CWtbM"></td></tr>
+    <tr data-page-node-id="gptjzzpoBtIhn6HgGTnMek"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="0WDREPIZB0Q3RLaHNw75fy">10</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7rcRWSVBZ1JvFCOKm9sVBO">四类颜色写法</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="v1MAugT4u6OTmtZMTirXML">简写、rgb、rgba、英文色名均正确</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="8cVXoyFjvxSjaFjGaDrDD9"></td></tr>
+    <tr data-page-node-id="cd2Edb4x6wXybSFupBwAWw"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="f66YcIAZKbLHc0KPfwrDFO">11</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="TH28LzInI2dH1pgUj2tE2j">不支持的 CSS 属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Zv54h759htl19nszjEY0Bi">静默忽略，不丢文字</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YsUWd4FrT5ljlrLHEF0XGa"></td></tr>
+    <tr data-page-node-id="rVQJ1IoUkHLRs8ICu0J2OG"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="PDT3F6VT5UDBuRmK7lyn75">12</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Eudddgj25sXkdBjeog2g7f">链接四类地址</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="VQkMCGIOzJytyFtdVcPccA">http/https/带路径/相对均不崩</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="O7vAsBdhbEshGoXXB5SCp1"></td></tr>
+    <tr data-page-node-id="Q6A7okGejPzOWwLM0XOYOj"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="R1uEaeM5Bug3qrZzIr9Ya5">13</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="8ahMCVEtow8JtfZmEKZasP">链接内嵌 br</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="AETekaz4QlUGPQKb8u7ady">两段各自成行且都可点击</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="vIc74pQjo3lVE4Klw1EUdt"></td></tr>
+    <tr data-page-node-id="HYpzTBDXxMEXBlDVCGvxbA"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="eZEXTPK1lLAsdJeNPfqSai">14</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="0vqNul5AEoG0dpbMroq2jK">链接包图 / 空 href / 无 href / target+rel</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="g5m0BCcNbe9nmT12cRzASt">可渲染，无跳转也不闪退</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="dCvLBYd5dCH47hCyP3rfXH"></td></tr>
+    <tr data-page-node-id="Hjhy4OlkGdJfwOAB7YAQ66"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="rxAj7EQERiq2Hzbp7yRB32">15</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ChDiV5EIfUv7o4yB8uZ6vo">大图自适应（尺寸写在 style 里）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="t9FVbi8bemKTq7l3v1TkxD">≥60% 屏宽按比例铺满</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="wrNyJcN26zWbLu1OiWMd3d"></td></tr>
+    <tr data-page-node-id="huRFv2L7dpGsGiADunNBUu"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="9C5lkA7BEVSVkMYAOM103Q">16</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="mJ2vAJpbVWL92tT4Bogs2F">只有宽度 / 百分比宽度 / 无尺寸</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ahvr1EJBa2XfC3r3Q4T6TJ">不拉伸、不塌陷、不崩</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="kHze4aUGiVjnHvAwMzdBy8"></td></tr>
+    <tr data-page-node-id="bvjdHFDq4xePZs2m82otpQ"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="AKe1ez98rl1GSJEo34mtjK">17</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uwfg2tRHYgPtkvMHmsyWkF">小图不放大</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="JwsB6orhQwT38YTWCyYE5H">48/32 图标保持原尺寸</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="OHaJbQoJkWHhaXEf5diYBP"></td></tr>
+    <tr data-page-node-id="222CiStbCjrxVHA6fZfNih"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="CV8BV5gOCKBdpj7V40cVmw">18</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="hC52kAG9eAl1rOLr5VfxxS">宽高属性与 style 冲突</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2vBiCHVZzKdqQ2dK9EtKhC">组件属性优先（与浏览器相反）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="BROydnuSOFFvY6o3EDE6aH"></td></tr>
+    <tr data-page-node-id="vQ9mgDqgodsB77sADxDd6u"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="SW2mZP2dAEzf7AcLV7LtlC">19</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="iNDmD8WH6V8Z7BwbxUIdly">坏图</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="DDWFb9XUQ6LARqAAZyUYv2">占位色 + onImageLoadError</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="OO8DoRBg0Asg98beF1i0cu"></td></tr>
+    <tr data-page-node-id="oMzUEKkMc1TawG4FnYAZWV"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="yH8xePQNEAdSOx668MlT9J">20</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Xnm3esh7Xlbfik2WheGwmF">data: 内嵌图</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="c1UTAULZEmC7LmwzNjqzez">PNG/SVG 两种编码都能显示</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ey7IFMcDUVUmJSkDKfigir"></td></tr>
+    <tr data-page-node-id="j1UnX0RcmO8tAR0Ok79X9n"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="lXjddEk7M0eo57047IE6am">21</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="28oUptlxYpd3NS9uddZuOC">懒加载图 data-* 属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="6rckvVvB37FH4UlQeuFEUe">不影响渲染</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="LskicGwU9Q9gnFkwGxaP4E"></td></tr>
+    <tr data-page-node-id="VKU1C3qgfNAL9AmJtKXQai"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Lbf5iMffVZ2YboMedH6Tf1">22</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="LAkzGqB2GX1PHRTbtYG7Cm">多图预览序号</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="zAD2nvXiQQuE9Cjphg36eH">点第 2 张从第 2 张打开、可滑动</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="xvi7OkUKIpRQQx2ea8EPNB"></td></tr>
+    <tr data-page-node-id="31YdpH6ORssCiNtKLRRurT"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="t6N4GRBzeVKtofnBF5R5VM">23</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="exhPFOSzCrtMEPrTmDCWEP">列表三级嵌套</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="pq9pDV7zil81d3ocro4yBD">marker 依次 • ○ ▪，缩进递增</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="AD74yRqXd5dzwG9Rl6L1HO"></td></tr>
+    <tr data-page-node-id="B3wZ5hyU5EjefJBEx1FOw1"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ls3x7nzHLGCquhFLhXaEXH">24</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="XfuE6Vmwa2k58nqyQYVIs4">ol 编号连续性 / start 属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2NWwTBfqIg1yktD5uXUAig">1. 2. 3. 不跳号；start 被忽略</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="L0BUCsC4jGAXC3j6C5aFxu"></td></tr>
+    <tr data-page-node-id="JoINE4zXyQ4EA9761kxThI"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="EIE8HzX2jpDGLHKP4jO81c">25</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7UoN7bPdGAQb8hX3x4LYgK">ul type / 列表内联样式</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="PTg9qRYiBd1eB3HDvqJoMX">均无效，marker 与样式不变</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Nl1N644rENrsRmba2ewOdr"></td></tr>
+    <tr data-page-node-id="UhX1r1H3Wg9YnDf0clryNj"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="kAQUBexDBtWie3SKOI5RTU">26</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ey7CGEpVVJLik2X7JZDPK4">li 自身 style 与内部 span</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="QhQZfdRPxBWzFxR6ocEjBD">li 样式无效、内部 span 生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cDAoGkj04hTQU20IUQHbAi"></td></tr>
+    <tr data-page-node-id="W3ZMpRx2cvdjaIZAkyP9ux"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jr2VUAkgXsJ22wguCv1k6J">27</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="wfN0DX6yJ2YIjk0BzdoJYP">li 内 br / 图片 / 空项</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5WoqKGIawzg4M4srrPeWLU">同项内换行，图片不撑破，空项不堆叠</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YTBVb2Fg1hIZx6hmepMdg2"></td></tr>
+    <tr data-page-node-id="AAilZpGLOZGXzFqB7ImxRg"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YISUy9QS1IBxmjX9dPe62r">28</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZigBBDaDGJM0dAf9XH2xf3">blockquote 单段/多段</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ld4FHBF9tcp1Ni73rJJByb">高度紧贴内容，无 669vp 异常拉伸</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5CfFn9sI4shrQ5mmCTJIhR"></td></tr>
+    <tr data-page-node-id="g2ZC2YgS9jiGHgQHpcIPvT"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="WE174yPXHRP3nlwqLHgRX5">29</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="v8J8Oa8yecHVIMVIom54HQ">blockquote 自带样式被覆盖</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="lcSMyLik9gdeyjY5AyHgAB">背景/边框/内边距走 config，color 可继承</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="im8MMMiEVyH6ZUWbENUwP2"></td></tr>
+    <tr data-page-node-id="EmANFcrvHrQgtgwMEHYnCU"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="RCr7YgxGEZLpx4LZTERyQO">30</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="3etZnN6Sn6eeZjbmCDkbEk">blockquote 内嵌套</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Uin6SDRkfDGn0xZyYidtFX">列表/代码/标题/嵌套引用均存活</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="RFEApAAwsd2B6B6ntdZiTy"></td></tr>
+    <tr data-page-node-id="q0lfetqKXG4JkZvanI3H7J"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="psGz6Sfj3pGOhyZtEqKGEi">31</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7A3FGWYlfzcdkbrUsUXG1y">代码块缩进与横向滚动</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="r2UDwcIYynAFkRcTOR0J3S">四层缩进对齐，超宽行横向滚动</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="thdgE2exOdNFMkI2mR9Vxd"></td></tr>
+    <tr data-page-node-id="clnqNLwXWGxyfhHMHB2u0Z"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="XfWftH1vQ27ffSKY42wN8q">32</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="552DMZvbCyWcmHP1BXsnZZ">data-language 语言识别</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2tGFFPvk1SQWBvtR6IB0HH">高亮生效；无标记则纯文本渲染</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="B7VM1qwzEtEDaRj0mU0kBG"></td></tr>
+    <tr data-page-node-id="hxO6LCYVyvatv9MctdDKQ0"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Ghmo46Chd9iQgK4UtwbZw2">33</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="r6HNPYxZAwA9Xg6BJydY6T">pre 自带深色主题被覆盖</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ei0jIYJ3U60OHtvQUVSLKb">代码块样式走 config，不读内联 style</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="M2zgHZBZy50dh0rTyk3vFN"></td></tr>
+    <tr data-page-node-id="gzFrBVQrzegb83EYgolhVS"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cOxcq6cYLGADdjCVe2Z5bP">34</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="eNdcrujDt7FkBsf6nG3GlK">代码块空行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="CoVdEU5wufO2Cm0iDkAcq8">行高保留，不被吃掉</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="sjFEIbdE1cGcMDr0QDZ5yH"></td></tr>
+    <tr data-page-node-id="MnbJ61MNTIZ2XSDPTRWLie"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Bg0gcKulA13BAZifilbw4x">35</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="nEbi1zvgdrNrhtspafaJbP">最简表格（无表头）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="XT0slYqH0gatDDvc9pREmX">正常成表，行等高</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="t9l5mdUrPr5pZ5lX1w3NUf"></td></tr>
+    <tr data-page-node-id="g8z2Ly5hQDVOXjhvPVzwtj"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="q5lx0uefP3WpkeumMexnVl">36</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7QDPHVW75R6suj1fdfAK8W">thead/tbody + th 表头</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jwDPzxHHzVoSiQebHzkhFs">表头底色与字重生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="pdv1hLiZBDhRrNMeSWCBr6"></td></tr>
+    <tr data-page-node-id="AoCFVeGxLMK4lhA3k3STgz"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ssvXQYRDqi24ao0DMy3WeZ">37</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="HXhGPCXKOogDkfhNU9fwxk">colspan 位于行中间</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="K1w1cjEp0TMMpeBPqHL8d8">已知风险点：是否与相邻行重叠</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jHdXg9LKt3TcV3tMG7sLW3"></td></tr>
+    <tr data-page-node-id="jb1qnQqEpA9LcRHWFIxc2k"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="8LbcfvdOQ9QuFU1iilsSjw">38</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="eNo1gPG21XVyJtYAXKQJqH">colspan 行首 / rowspan 跨行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uF25V2fEI8JiKk7LEXHCO9">跨列与纵向合并正确，右侧不错位</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="sHkECZUbCtaFy1HdOx6y1W"></td></tr>
+    <tr data-page-node-id="ulAP994Jt59jFw8LTKCfgk"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="wbXeqHTcbcBnpM1amBuvLR">39</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="aeUhiaiT1rFMUC8XtplDYn">td 的 align 属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="aeDNzKCMpGbsDIG0JOppcY">左/中/右对齐生效</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="yYaGxeJsEHxNpgu9uawl2Y"></td></tr>
+    <tr data-page-node-id="6zHGHuFGAITuisyssZZR0Q"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1E0Q0yM9sD463XdxlGlXu5">40</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Mpr5V44GuHsClRpdVA92fY">td 上的内联 style</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jiEbqpBiwncwWrRF4GuDko">完全无效（含 color 与 text-align）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="GBBxGUtElzeixfAVWZpEZ9"></td></tr>
+    <tr data-page-node-id="h7dloPsPV0CtCBuCZCwMgc"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="02FvSvCK3GypyIWUccVrcp">41</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2qyvC0YTPBdriQD0xqs5AT">单元格内部的 span 样式</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="a0GE4z3iYMXIOcxih21YdG">有效（改色可见）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="fll3ckHRLA28Fpq4PpR5EG"></td></tr>
+    <tr data-page-node-id="113DrwZLsDqzpMorjqLX5p"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="UtJ1jD7ExPGuR0YGmsYEuE">42</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="XYE2gVKiJEhDC8EBdhS4L4">table border/cellpadding/cellspacing</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="PQIfBGgG2AR91Z0GGGHlik">被忽略，样式走 config</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="i0lir7yndzrZnVtIHGfAvg"></td></tr>
+    <tr data-page-node-id="mID8hSvhwtmhuFv0ffTM4G"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="NP7Pp7qWMgFgtgrgfzUjVp">43</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uxusU0RekO8AVXtnijapLx">单元格富内容</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="3jIb6my5HqfD62yeGpLzyo">行内标签/br/长文本/空单元格均正常</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="f2N1neJEPRcMe3Hanw3hZY"></td></tr>
+    <tr data-page-node-id="CC6G0wFfAA5HtttnCxdSed"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="6cO3lVugkcpdC5Kz8tTMBr">44</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="LM7N2KkbQNUAY0H6BufQF6">单元格内超长无空格串</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="29E3b87ULTQs44kX6djywB">不撑破列宽</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4WwHm8SXq1VbNAkPbJbFAg"></td></tr>
+    <tr data-page-node-id="JuM9oGnvDttsqe4ush5zMa"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="33KIz0dthtlYPAhCN21MK7">45</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="SRag30Y4sfHNpRXSrU6ijo">6 列宽表</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="DIFhV6s7ZFfrJbBY6sjO7G">窄屏不横向溢出，文字换行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="9DUC1ljzi8uIqLkVQfT14T"></td></tr>
+    <tr data-page-node-id="X4XgBvOYKr5XCh3BLFd0Th"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="tZxEJx6v64ejKHtxtGfzB8">46</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="zHhw6HAwucG3RGztANAKEB">div 包裹的表格</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="qvsRKyE2W69NAARLjRAVP9">整表渲染不丢失、不退化</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="eYXLQsRUVbJtDXYieDTWS5"></td></tr>
+    <tr data-page-node-id="Xl9eezFTfj16TjkiU6cjJh"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZCGwQNVxyAOR4LYRD8VP2y">47</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="LC6QHQnYJKcU2ZaHaoBLyM">引用块内表格</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="iLShKmTRy4uj1cHLGMbyFw">表格在引用块内正常存活</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7htMo40tHarhjviZMFpft6"></td></tr>
+    <tr data-page-node-id="kfYk8DH5rJJeKuesfSQgRu"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jUxSpvY6nfJTSANPKNsAdO">48</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ju0qyHbk9sxJyGCBVEmudo">单元格内嵌表格</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2tmCwnanQYXspO6qKDAqIt">已知降级：不崩、外层列数不错乱</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Pp2oWZSFWUJhokeRHezA2c"></td></tr>
+    <tr data-page-node-id="qDxKdLgGmB0ApIGppcjqb9"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="HDxb4kZheE8NhVLdUJ5w2E">49</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="OcKe1NKj9hvr87b56HNeoi">斑马纹配置</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="QyJibik9bTBAPesFad1ujW">改配置后奇偶行背景区分</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1U6dEGv1gmGwvlHMXsrQto"></td></tr>
+    <tr data-page-node-id="3K3bqmBUCl5rN1pbvjhh4F"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4BZeY7smszCKTEkCj0QpUK">50</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="NlHlKdh1ussUEKpqgRIv5M">只有表头 / 完全没有行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cf5pOw5TwqD2xoMA3IlrDW">前者成表、后者整块不渲染</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="P5nQVKnobx4V6Yl0DnNcTs"></td></tr>
+    <tr data-page-node-id="DD6NeCtLbSTHebSmxkWEMv"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cMqvLAaQnSgBLiKnrtrvSe">51</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="p5qiWbXe1S1mn0PJSO9ipj">本清单表本身（76 行）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="fe7Tw2kwPjUODz09U5MLeT">长表行高稳定、滚动流畅</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uVXxoJuUnVIjsaBAf8EPYJ"></td></tr>
+    <tr data-page-node-id="l4jWYb9aYT0JRf2H5Fr9hk"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="yXYmGBK54RCyHaacasH4UW">52</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="9H26cm7hajjCG0HsiQueV6">命名实体全量</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="QIZE3N5kLctTyjXZRf4Z0N">全部正确替换，无残留 &amp;xxx;</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="TneGPPA0s321HgKfMaDFOe"></td></tr>
+    <tr data-page-node-id="n3th6OqUxstGbk9wqI6f5v"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="D3SLrV3kYOcZiN4gCZtmFk">53</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="VY93ZoHaipwiX4j4SBonGy">数字/十六进制实体</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Syac4A5aPwUJn36We725I1">含 emoji 与 4 字节汉字均正确</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="JClN7v7cVtVUDsPqZPSECP"></td></tr>
+    <tr data-page-node-id="uKc22TVJOmxmo1F5ev5biW"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="bYwyRreey2zzWjOnIOSQje">54</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZnCGZwJ65p1E9FXBca6D4Z">未收录实体与缺分号</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="sAB5GibULdUTTYIYyLUPN4">原样输出，不丢字</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="niao5HH16X4uCUKaGQu4Oh"></td></tr>
+    <tr data-page-node-id="IGCuz3vsfLNvhbtVyYLebN"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jAxnljus2VJuGp1YITXrEp">55</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="fDeloZJh7kZ8NldQyIKlJ0">换行/制表实体</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4WTw60Jr6QIyYLpB4Wq6uJ">与浏览器存在预期差异，不算 bug</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="FEjqCqwOzHMqLcVDvSrlXC"></td></tr>
+    <tr data-page-node-id="X4cMlHeHEbhtoscXB4sfMo"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2hpvqvTM5PyZfIcERzpzdo">56</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="MWD3T91kHPRCsBJItgZzQY">emoji / 全角 / 数学符号</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="yNoUtl0bY9tZ5ad7qmKTUK">utf8mb4 全程无损</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2tDGIEIUsYNysFWFF3toqc"></td></tr>
+    <tr data-page-node-id="jTS7JFjdkFj08iGybcdFC9"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="T4SAKtOpyj3uEo1aKyjyNs">57</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ymg1dc0DB5sfJ2A87sQuNK">大写标签与属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="U8E3SScs4m8NCyS1mtCfTm">统一转小写，style 照常解析</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="63dbqYrvlbdY2aue3RP87e"></td></tr>
+    <tr data-page-node-id="N8q0weGsykjTot48RtueTu"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="HHuYS5u7FhnAU1y4jBbtyh">58</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="tHeMlJRxWcjoQwfMvkQExl">三种引号与裸属性</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="O4nrC3nD68vDXiFJ5NJwKd">双引号/单引号/无引号均能解析</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="nsOtO6WVDxHJpLp0k0M5c8"></td></tr>
+    <tr data-page-node-id="iZHv1gVVhl7fULhcYzLUn4"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="q2UmCKhrBlMiYg2G7FMuxg">59</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1QKhwi4kfJQ3eV1WpHyLNz">自闭合与 void 标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="mYFfgC6XFbwR6nOtERivle">br/hr/img 各种写法均正常</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="tLoAuPc7Py7fMi6jHDPCwd"></td></tr>
+    <tr data-page-node-id="Aop8uLVxbSqYZCnCPo83dh"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="v7CuEN8CDLRB4lL78Balgg">60</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="6qDVwJHDHKSgKIyBznkAQe">文本里的裸尖括号</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1Wgw2PrXyYgC4aDoHmX4eZ">按普通字符输出，不吞后续内容</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="c7p9kjD0ir9G4Mml9K9A89"></td></tr>
+    <tr data-page-node-id="xRBZt1b9oteKj3mOxDEAU8"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Yk1TWTGmFGJmLPL6xXRPBd">61</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="G2imJUMTHNaTu1InONBEBu">多余闭合标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="axN2c45dwA5RFf03JhzrAT">全部忽略，前后文字完整</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7WAda8EFmMuAMt2BO2U0ru"></td></tr>
+    <tr data-page-node-id="0oVfIMLRh5Zsm2hPnVyMHH"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="7o53QQeRvBrJetEStv2ikM">62</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ufJR3bmRF9qjQy3A4CQPJ7">Word 粘贴痕迹（o:p / MSO 样式）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="e1Z47LTD3iRHQW9FEiWgSe">不崩不吞文；o:p 的吞并见案例 E6</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="TGcBTICwuG1qDNFR7hKS1Z"></td></tr>
+    <tr data-page-node-id="wBZ8Zdn66czhcrIktWAOMl"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="0Ulu598BBXt1QbIcJzYSlW">63</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="uLTQUxAw9Ra4zUWDgnzXBm">script/style/注释/模板不可见</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ARw6iHcHO87JoHWtwCEq72">内容完全不可见</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="8RAZAeEZrdnBwzkxJNtS5u"></td></tr>
+    <tr data-page-node-id="dDzcQbyQuWzWbvK36dLca4"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ubrSa1QxDsA5q9zZHKUr17">64</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1fz2ebigBFJ4cCyQDYALrm">空标签与空白段落</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="t4NetA97GofEVz7JC45HE1">不产生空行堆叠（含 &lt;p&gt;&lt;br/&gt;&lt;/p&gt;）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="rdzoWHvMZOF9P18GPcxFRF"></td></tr>
+    <tr data-page-node-id="Z3SZBIHIcauzw9ZQTB78KP"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="FHAwCHTjvrHEthhRCnzV3e">65</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cKYgHHKyseX6ZfIkdgoYrF">文本+br+链接混排</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="Yhb7J7krmimH5zfPHCxQSF">链接留在本行，不上浮错位</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="npqNWcxTUfpVTd7WVdCntX"></td></tr>
+    <tr data-page-node-id="McinNkjwPUKekVBnGboaSm"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="jRsKbkl7gBYOftGxmoh3H0">66</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="dwssjOsEZPp31GFoeka3N4">连续 br 空行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="urHRlktyY1OHIqe8MYm5kr">空行高度保留不塌陷</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="HfDF8jwG6ELVUsLxEJODrK"></td></tr>
+    <tr data-page-node-id="zS4N8xbV0zgzhwF91x5c0B"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="fi9GoQlTRXhqSaSPB8lSxQ">67</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4q2WVUs1CvoEtS6C0NPANn">段首/段尾 br</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="3BDsydjzgnwRppuhUfB1wW">与浏览器一致，或差异可接受</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5mA0QZMnlZvUwpjvwmOoF1"></td></tr>
+    <tr data-page-node-id="ZfpSqiGOry8HP1jYXc8AC5"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="iWxeU18vGZ9wwYLWxCg1t0">68</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="NXzhRTc6rLHZlBaKVUPnDz">超长无空格串折行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZJItCKXM00wcrTOW6bx3Wj">不横向溢出、不闪退</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="FqUuOadS7jvHTwYJNlJL84"></td></tr>
+    <tr data-page-node-id="ua3U4GSOXEfFuma3eKFAw7"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="SreobP797Blmh2ekOUoLft">69</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="R1iE2iE3l7bAisAdcBBm4s">中英混排与标点</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4BFuLasT4tQQ6NaWOlqDBu">记录折行位置差异</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="9bT3MbKUlDmJHUIX8WpEUy"></td></tr>
+    <tr data-page-node-id="DksPPR165LRKUubKV06sTS"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="PpqZN1KeO5GUmQueDYYgpH">70</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="avEuzMbVMALuS4mRBsXNRB">nbsp 缩进</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ZN6EhdZrxTTnBP7t2RWa5G">不换行空格不被合并</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="2ZntYvqAAuOd20WIzc4KBk"></td></tr>
+    <tr data-page-node-id="KVocEej3ACqjEULLvW4ghP"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="AZQ91aqFAPgfNJ9VurhJER">71</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ml4muUFQeFvGC0ZkqmGCna">p 内嵌块级标签</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="rHHVHQuxl1XnjTStec7Hij">拆成独立段落，不挤在一行</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="cFoKKbcDpEGDCRXHz44e63"></td></tr>
+    <tr data-page-node-id="Z7qJWA0sCAYdhDD2usDKo9"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4nNtcmurwIZoIM6us4cTBI">72</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="FtuRmaDvOxqbBK0S1lKnc0">容器标签（section/header/footer/address）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="kGL4iKSDlGno4Z3jViUrDj">内容正常渲染，address 的斜体可被压回</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="BT8UCWKsFrTDvozXdnJmBo"></td></tr>
+    <tr data-page-node-id="7Npxn2v8de02b5kp9tVliz"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="drtxgqADqhvTDSWIXvWzPQ">73</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="TNOGv1WPneRJOMzX5aoQdb">center / details / summary / form</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="QuEGbDqBNTaetWNq5L5bbd">只渲染文字，不崩</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="E5w6sxHhYAqAxNYpjWcuuK"></td></tr>
+    <tr data-page-node-id="s8WbyPXWWBH58B8lRqmtGl"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5zIAOejDICgAFBTYWCDWB2">74</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="OthWjYqsGktQg6b1ys9rEU">未知标签（无连字符/冒号）</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="VVm4f6BJK5UJ91khdSStYa">兜底渲染文字，不留大块空白</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="u8VehGUN34D7mmGRuVQ8FZ"></td></tr>
+    <tr data-page-node-id="uYwUWTIHx70wwEBHOHBvzh"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="4MnBuYN4xaDAWJCxQebdjt">75</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="5qTGg9FqaNuCBvGlHVlXwD">长文压力</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="YsEkfOONwlqlgBww2bZA1B">解析耗时与滚动流畅度可接受</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="K2cqqF9YmAK2jmBfV0QW6x"></td></tr>
+    <tr data-page-node-id="Z7iUxGIlfORgrdJ7P4nj4Y"><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="ErH7KUVpjpnNhBEv7UnusR">76</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="i0ywcFAuLr8z3PBLgS66Uq">极端容错样本 E1~E7</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="BLWjcVKpvPzHAozHvzjiO1">不崩不闪退；各案例说明的行为一致</td><td style="border:1px solid #E5E6EB;padding:8px;" data-page-node-id="1YCBEz9H5IXYEPoK5NxZjI"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">77</td><td style="border:1px solid #E5E6EB;padding:8px;">14a 块级背景</td><td style="border:1px solid #E5E6EB;padding:8px;">段落底色应整段铺满（含每行右侧到屏幕边缘的留白）；段内 span 不被段落底色染色</td><td style="border:1px solid #E5E6EB;padding:8px;"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">78</td><td style="border:1px solid #E5E6EB;padding:8px;">14b 行内背景</td><td style="border:1px solid #E5E6EB;padding:8px;">mark 默认浅黄、span 蓝底、加粗橙底：各自只覆盖自己的那几个字，不连成片、不铺满整行</td><td style="border:1px solid #E5E6EB;padding:8px;"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">79</td><td style="border:1px solid #E5E6EB;padding:8px;">14c 单元格背景</td><td style="border:1px solid #E5E6EB;padding:8px;">td/th 自身底色优先于表头底色与斑马纹；未写背景的格子走斑马纹配置</td><td style="border:1px solid #E5E6EB;padding:8px;"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">80</td><td style="border:1px solid #E5E6EB;padding:8px;">14d pre 背景</td><td style="border:1px solid #E5E6EB;padding:8px;">写了内联背景 → 深色底生效；没写 → 回落到 config.codeBlockBackground（浅灰）</td><td style="border:1px solid #E5E6EB;padding:8px;"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">81</td><td style="border:1px solid #E5E6EB;padding:8px;">14e 引用块背景</td><td style="border:1px solid #E5E6EB;padding:8px;">写了内联背景 → 粉色生效；没写 → 回落到 config.quoteBackground；内部段落不被染色</td><td style="border:1px solid #E5E6EB;padding:8px;"></td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">82</td><td style="border:1px solid #E5E6EB;padding:8px;">15a 跨列定位</td><td style="border:1px solid #E5E6EB;padding:8px;">9.3 表里"行尾单列"仍在第 3 列，没有掉到下一行</td><td style="border:1px solid #E5E6EB;padding:8px;">&nbsp;</td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">83</td><td style="border:1px solid #E5E6EB;padding:8px;">15b 跨行合并</td><td style="border:1px solid #E5E6EB;padding:8px;">9.3 表第 1 列上下两行合并成一整格，第 5 行从第 2 列开始</td><td style="border:1px solid #E5E6EB;padding:8px;">&nbsp;</td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">84</td><td style="border:1px solid #E5E6EB;padding:8px;">15c 宽表横向滚动</td><td style="border:1px solid #E5E6EB;padding:8px;">9.6 的 6 列表可在表格区域内左右滑动，表头随之一同横移</td><td style="border:1px solid #E5E6EB;padding:8px;">&nbsp;</td></tr>
+    <tr><td style="border:1px solid #E5E6EB;padding:8px;">85</td><td style="border:1px solid #E5E6EB;padding:8px;">15d 表头固定</td><td style="border:1px solid #E5E6EB;padding:8px;">把 tableMaxHeight 设为 400 后，表格内部纵向滚动时表头始终可见</td><td style="border:1px solid #E5E6EB;padding:8px;">&nbsp;</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:21px;font-weight:700;color:#1A1A1A;margin-top:32px;margin-bottom:8px;" data-page-node-id="TXo7ZEyoKs7lGAe0wBPP6k">附：极端容错样本（建议单独入库测试）</p>
+
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="Wmg91pU4aAukdOZBte29Db">下面七组样本都会触发"未闭合标签向后吞并"的容错语义：一个没有闭合的开始标签，
+会把后面的兄弟节点一直收进自己的子树，直到遇到"够数量"的同名闭合标签（或直到字符串结束）。
+这跟浏览器基于 DTD 的隐式闭合规则不一样，属于设计取舍——渲染顺序和文字内容都不丢，但结构归属会偏移。
+因为这种偏移会影响后续内容的判读，所以把它们统一挪到全文最后，前面每一组都用复位标签兜住。</p>
+
+<!-- CASE-E1 | 未闭合的行内标签会向后吞并，直到遇到同名闭合标签 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="l8nTFgKE1vUTkNsEWDEzac">案例 E1：这一段的加粗标签没有闭合。<b data-page-node-id="Dy7d4rcvoED6u2SCcmZEGq">从这里开始进入加粗区，
+它会一直向后吞并兄弟节点，直到遇到够数量的 &lt;/b&gt;——也就是下面那个复位标签。</p>
+</b>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="Nxyr6ODdb1coFm8Mtec3cJ">案例 E1 收尾：上面那个复位标签同时也是一个"多余闭合标签"，应被忽略。
+本段文字不应带加粗、不应消失，也不能与上一段合并。</p>
+
+<!-- CASE-E2 | 未闭合的块级标签会吞掉后续兄弟节点 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="25ENTDVIQuHYEmBYC1CdXE">案例 E2：下面这个 div 没有闭合，它会把后面直到复位标签之间的兄弟节点都收进自己的子树。
+期望：渲染顺序不变、文字不丢，只是结构归属变了。</p>
+<div style="margin-top:10px;margin-bottom:10px;" data-page-node-id="xH8dBQ2VXtYPavewLKC9Tz">
+  <p style="font-size:16px;line-height:1.7;" data-page-node-id="ZxFq4y1itoMZ3IOCWuP8BD">未闭合 div 里的第一段</p>
+<p style="font-size:16px;line-height:1.7;" data-page-node-id="MrvxOPd7r86HYfitL5uQDY">这一段在 div 之后、但按容错语义会被收进 div，期望仍然渲染出来。</p>
+</div>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="S6TRMnVf897bdYsBBib6RH">案例 E2 收尾：上面那个 &lt;/div&gt; 是复位标签，本段应在 div 外面正常渲染。</p>
+
+<!-- CASE-E3 | 孤立的闭合标签：开始标签不存在 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="RL4mmdIDKJ0o4jC1kFW5zo">案例 E3：下面这一行全是孤立的闭合标签，对应的开始标签压根没有：</p>
+</div></td></tr></table></li></ol>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="UJTGbSbJi2ayDJWkuFw9pH">案例 E3 收尾：上一行的六个孤立闭合标签应被安静忽略，本段文字必须完整显示。
+如果本段消失，说明闭合标签的容错逻辑有问题。</p>
+
+<!-- CASE-E4 | 隐式闭合段落：两个未闭合的 p，需要两个复位标签才配平 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="LHx5E5YHLtubQ9nQwj3iIe">案例 E4：下面这一行里有两个并列的 p 开始标签，按浏览器规则第二个会自动闭合第一个，
+按本组件的语义则是嵌套。两个未闭合的 p，需要两个 &lt;/p&gt; 才配平：</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="uNlxv9LH7IfFwOlydHcHGT">第一个 p（未闭合）<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="GCoV65AS0DkRdBVGWry2uX">第二个 p（未闭合，嵌在第一个里面）
+</p>
+</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="9ykWNVgsglRcM32p5LqWBk">案例 E4 收尾：上面两行 &lt;/p&gt; 是复位标签。本段应正常渲染在它们之后，
+且不带任何多余的段落嵌套。</p>
+
+<!-- CASE-E5 | 含连字符的自定义标签：标签名被截断 + 闭合标签失配（真实缺陷，需修复） -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="7qpnq1DFEgbbaeQBzstOpc">案例 E5：下面这个自定义标签名里带连字符。解析器的标签名正则只接受
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="pcOaM4DcvkuKFb6K2ElTro">[a-zA-Z][a-zA-Z0-9]*</code>，
+遇到连字符就截断，于是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="aq9IAsJZ4usdk9xqmUz21b">&lt;my-widget&gt;</code>
+被当成 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="hMaiIpuEXltK17NHEwYyEH">my</code> 标签打开；
+而闭合标签按空格切分后是 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="RY5Yh6sFeMfo98vdD429XL">my-widget</code>，
+跟 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="1MWyKFlfClrYJWKwZMwZzd">my</code> 对不上，
+所以它等不到闭合标签，会一路吞并后续内容。下面用不带连字符的复位标签把它兜住：</p>
+<my-widget style="color:#FF6B00;" data-page-node-id="M2Jl008IFwleCX46aLFLXT">被当成 my 标签打开，从这句开始的内容都归它所有，一直到下面的复位标签为止。</my-widget>
+</my>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="ulzwTU9eBK8oYVe09Vk4RJ">案例 E5 收尾：上面那个 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="u0gOeMbxy6tDBfLgufE1M4">&lt;/my&gt;</code>
+是复位标签——只有写成不带连字符的 <code data-page-node-id="UvGKw0e3eZbfNIZvf4h3Uk">&lt;/my&gt;</code> 才能匹配上。<strong data-page-node-id="4ylJ9oHvLwCeWn0xfri1tL">本段必须完整显示</strong>；
+如果本段连同它后面的所有内容一起消失了，就说明这个缺陷仍在
+（在文档中段遇到这种标签时，会把后面整篇内容吞掉，而且连颜色都会被那个内联 style 污染）。</p>
+
+<!-- CASE-E6 | Word 粘贴的 <o:p>：标签名被冒号截断，同一类缺陷 -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="7fvHGfW0dhFO0EoA8rcfkd">案例 E6：Word 粘贴最常见的产物
+<code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="ZZd8tLKl54RYAJiKXRRWzd">&lt;o:p&gt;</code> 会命中同一类缺陷——
+标签名正则在冒号处截断，于是它被当成 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="rDTGjI0chKflBZm6UOUutc">o</code> 标签打开：
+<o:p data-page-node-id="HeBsd28jz3psdDrxtK6AHs"></o:p></o>
+这一段在复位标签 <code style="font-family:Consolas,monospace;font-size:15px;color:#D6336C;" data-page-node-id="surpdiOleW6BzGGuaWSD16">&lt;/o&gt;</code> 之后，
+必须完整显示。<strong data-page-node-id="y7Oo5QPBUJkQ7qlb40lZaz">注意真实场景里不会有这个复位标签</strong>——后台直接粘 Word 内容时，
+第一个 <code data-page-node-id="7msfHcm4zPjzRSu79f64vB">&lt;o:p&gt;</code> 就会把后面的正文全部吞掉（案例 E5 是同一个根因，一起修）。</p>
+
+<!-- CASE-E7 | 未闭合的行内标签一直吞到文末（本组最后一个样本） -->
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="kX2Kwl8cLS1dnHBbmhGir8">案例 E7：这是最后一组，也是最极端的一组。下面有一个未闭合的链接和一个未闭合的 span，
+它们后面不再有任何复位标签，所以会把后面的全部文字都吞进去。</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="TTB4DwEoMmLfGhDHDdg7Qu">链接开始：<a href="https://www.harmonyos.com" style="color:#1E6FFF;text-decoration:underline;" data-page-node-id="it959cA3w1nP8khEjaA9gb">从这句话开始一直到本文结束，都会是链接的一部分</a>，
+接着是未闭合的 span：<span style="color:#D6336C" data-page-node-id="YPWjZRWAQsa5RRYwlwNwPE">从这里到文末都会是粉色文字。
+所以下面这段看起来也会是粉色带下划线的链接：</p>
+<p style="font-size:16px;line-height:1.7;color:#2B2B2B;" data-page-node-id="L8soBvfS48dLTQiOCI1aIw">这段文字预期会被前面的未闭合标签吞并，因此显示为粉色 + 下划线 + 可点击。
+这正是容错语义的必然结果，不是崩溃也不是样式错误——只要文字没丢、没闪退，就算通过。</p>
+
+</article>
+
+<!-- ==================== DB-PAYLOAD-END ==================== -->
+
+</body>
+</html>

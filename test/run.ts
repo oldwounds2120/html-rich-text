@@ -7,7 +7,8 @@ import { HtmlParser } from './HtmlParser.ts';
 import { RichTextBuilder } from './RichTextBuilder.ts';
 import { RichTextConfig } from './RichTextConfig.ts';
 import { SimpleCodeHighlighter } from './SimpleCodeHighlighter.ts';
-import { NodeType, RenderBlock, InlineGroup, RichSpan } from './RichTextModels.ts';
+import { NodeType, RenderBlock, InlineGroup, RichSpan, TableCell } from './RichTextModels.ts';
+import { buildTableSlots, countTableCols, countHeaderRows } from './TableLayout.ts';
 
 let passed = 0;
 let failed = 0;
@@ -311,6 +312,227 @@ console.log('\n[16b] 视觉行拆分：纯文本/链接内嵌 br/空行');
   const elLines = emptyLine[0].groupLines;
   assert(elLines.length === 3, '连续空行生成 3 行（含占位行）: ' + String(elLines.length));
   assert(elLines[1].length === 1 && elLines[1][0].spans[0].text === ' ', '空行以空格文本占位');
+}
+
+console.log('\n[17] 背景色语义（块级铺块 / 不可继承 / 行内只覆盖文字 / config 兜底）');
+{
+  const cfg = new RichTextConfig();
+
+  // 17a 段落背景：整段由"块"持有，不再漏给段内每个 Span
+  const p = build('<p style="background-color:#FFF3CD;">换行测试：<span style="color:#1E6FFF;">局部 span</span>，回到段落自己的颜色。</p>');
+  assert(p.length === 1 && p[0].kind === 'text', '段落生成一个文本块');
+  assert(p[0].backgroundColor === '#fff3cd', '段落背景落到块上（整段铺满）: ' + String(p[0].backgroundColor));
+  const pSpans = p[0].groups[0].spans;
+  assert(pSpans.every((sp: RichSpan) => sp.backgroundColor === undefined), '段内 Span 不再继承段落底色');
+  const blue = pSpans.find((sp: RichSpan) => sp.color === '#1e6fff');
+  assert(blue !== undefined && blue.backgroundColor === undefined, '段内 span 只保留自己的文字色');
+
+  // 17b 行内元素自身的背景：留在 Span 上（只覆盖文字），且不污染同级文字
+  const inline = build('<p><span style="background-color:#FFE58F;">行内底色</span>普通文字</p>');
+  assert(inline[0].backgroundColor === undefined, '行内底色不会上升成块背景');
+  assert(inline[0].groups[0].spans[0].backgroundColor === '#ffe58f', 'span 自身底色保留在 Span 上');
+  assert(inline[0].groups[0].spans[1].backgroundColor === undefined, '同级普通文字不被 span 底色污染');
+
+  // 17c mark 标签默认高亮（硬编码 #FFE58F）与内联覆盖
+  const mark = build('<p>这是<mark>高亮</mark>文字</p>');
+  const markSpan = mark[0].groups[0].spans.find((sp: RichSpan) => sp.backgroundColor !== undefined);
+  assert(markSpan !== undefined && markSpan.backgroundColor === '#FFE58F', 'mark 默认高亮保留在 Span 上');
+  const mark2 = build('<p><mark style="background-color:#D0EBFF;">蓝底</mark></p>');
+  assert(mark2[0].groups[0].spans[0].backgroundColor === '#d0ebff', 'mark 内联背景覆盖默认色');
+
+  // 17d 段落之间互不污染
+  const two = build('<p style="background-color:#FFF3CD;">有底色</p><p>没底色</p>');
+  assert(two[0].backgroundColor === '#fff3cd' && two[1].backgroundColor === undefined,
+    '块级底色不影响相邻块（不继承）');
+
+  // 17e 单元格背景：td/th 自身底色落到 TableCell，且不再漏进单元格内 Span
+  const table = build('<table><tr><th style="background-color:#F5F6F7;">H</th><td style="background-color:#FFE58F;">A</td></tr><tr><td>B</td></tr></table>');
+  assert(table[0].kind === 'table', '表格生成');
+  assert(table[0].tableRows[0][0].backgroundColor === '#f5f6f7', '表头单元格背景落到 TableCell');
+  assert(table[0].tableRows[0][1].backgroundColor === '#ffe58f', '数据单元格背景落到 TableCell');
+  assert(table[0].tableRows[1][0].backgroundColor === undefined, '未设背景的单元格保持 undefined（走斑马纹兜底）');
+  assert(table[0].tableRows[0][1].groups[0].spans.every((sp: RichSpan) => sp.backgroundColor === undefined),
+    '单元格背景不再漏进单元格内 Span');
+
+  // 17f 容器只有块级子元素时，底色下放给子块（扁平模型的降级实现）
+  const div = build('<div style="background-color:#EEEEEE;"><p>子段</p></div>');
+  assert(div.length === 1 && div[0].backgroundColor === '#eeeeee', 'div 底色下放给块级子块（底色仍可见）');
+
+  // 17g pre：内联优先、config 兜底
+  const preOwn = build('<pre style="background-color:#0D1117;">code</pre>');
+  assert(preOwn[0].backgroundColor === '#0d1117', 'pre 内联背景优先于 config: ' + String(preOwn[0].backgroundColor));
+  const preDefault = build('<pre>code</pre>');
+  assert(preDefault[0].backgroundColor === cfg.codeBlockBackground, 'pre 无内联色时 config 兜底');
+
+  // 17h blockquote：内联优先、config 兜底，且内部段落不被引用块底色污染
+  const qOwn = build('<blockquote style="background-color:#FFF0F6;"><p>引用</p></blockquote>');
+  assert(qOwn[0].backgroundColor === '#fff0f6', 'blockquote 内联背景优先于 config');
+  assert(qOwn[0].children[0].backgroundColor === undefined, '引用块内部段落不继承引用块底色');
+  const qDefault = build('<blockquote><p>引用</p></blockquote>');
+  assert(qDefault[0].backgroundColor === cfg.quoteBackground, 'blockquote 无内联色时 config 兜底');
+
+  // 17i 行内嵌套：行内祖先的底色必须传给行内子元素。
+  // 漏掉这一层，<code><strong>x</strong></code> 里内层 strong 重算样式时会把 code 的
+  // 灰底丢掉 → 整句只剩玫红字、没有底色（真机文章 178 的实测缺陷）。
+  const cStrong = build('<p><code><strong>AG</strong></code></p>');
+  assert(cStrong[0].groups[0].spans[0].backgroundColor === cfg.inlineCodeBackground,
+    '<code><strong> 内层 strong 继承 code 灰底: ' + String(cStrong[0].groups[0].spans[0].backgroundColor));
+  const cEm = build('<p><code><em>AG</em></code></p>');
+  assert(cEm[0].groups[0].spans[0].backgroundColor === cfg.inlineCodeBackground, '<code><em> 同样保留 code 灰底');
+  const cSpan = build('<p><code><span>AG</span></code></p>');
+  assert(cSpan[0].groups[0].spans[0].backgroundColor === cfg.inlineCodeBackground, '<code><span> 同样保留 code 灰底');
+  const mStrong = build('<p><mark><strong>AG</strong></mark></p>');
+  assert(mStrong[0].groups[0].spans[0].backgroundColor === '#FFE58F', '<mark><strong> 内层继承 mark 高亮底');
+  const sCode = build('<p><strong><code>AG</code></strong></p>');
+  assert(sCode[0].groups[0].spans[0].backgroundColor === cfg.inlineCodeBackground,
+    '<strong><code> 外层加粗不影响内层 code 自带灰底');
+
+  // 17j 关键安全边界：块级底色依旧不进行内内容（否则 17a 会退化成"每条碎色块"）
+  const blockVsCode = build('<p style="background-color:#FF0000;">A<code>B</code></p>');
+  assert(blockVsCode[0].backgroundColor === '#ff0000', '段落底色仍整段铺满');
+  const bvSpans = blockVsCode[0].groups[0].spans;
+  const spanA = bvSpans.find((sp: RichSpan) => sp.text === 'A');
+  const spanB = bvSpans.find((sp: RichSpan) => sp.text === 'B');
+  assert(spanA !== undefined && spanA.backgroundColor === undefined, '普通文字不继承段落底色');
+  assert(spanB !== undefined && spanB.backgroundColor === cfg.inlineCodeBackground,
+    '同段 code 用的是自己的灰底，不是段落底色: ' + String(spanB?.backgroundColor));
+  const sibling = build('<p><code>A</code>B</p>');
+  assert(sibling[0].groups[0].spans[1].backgroundColor === undefined, 'code 的底色不漏给同级普通文字');
+}
+
+console.log('\n[18] 表格矩阵布局（colspan / rowspan）');
+{
+  // 真机上错位的那张表：表头跨 3 列 + 行中间 colspan=2 + 首列 rowspan=2
+  const html =
+    '<table>' +
+    '<tr><th colspan="3">表头跨三列</th></tr>' +
+    '<tr><td>普通单元格</td><td colspan="2">跨两列，且位于行中间</td></tr>' +
+    '<tr><td colspan="2">行首跨两列</td><td>行尾单列</td></tr>' +
+    '<tr><td rowspan="2">纵向跨两行</td><td>右侧第一行</td><td>右侧第一行</td></tr>' +
+    '<tr><td>右侧第二行</td><td>右侧第二行</td></tr>' +
+    '</table>';
+  const tb = build(html)[0];
+  assert(tb.kind === 'table', '解析出 table 块');
+  assert(tb.tableCols === 3, '真实列数 = 3（实际 ' + tb.tableCols + '）');
+  assert(countTableCols(tb.tableRows) === 3, 'countTableCols 与构建层写入的列数一致');
+
+  const slots = buildTableSlots(tb.tableRows);
+  const shape = slots.map((s) => `${s.rowIndex},${s.colStart}+${s.colSpan}x${s.rowSpan}`).join(' | ');
+  assert(slots.length === 10, '槽位数 = 10（实际 ' + slots.length + '）');
+  assert(
+    shape === '0,0+3x1 | 1,0+1x1 | 1,1+2x1 | 2,0+2x1 | 2,2+1x1 | 3,0+1x2 | 3,1+1x1 | 3,2+1x1 | 4,1+1x1 | 4,2+1x1',
+    '矩阵与 HTML 语义一致: ' + shape
+  );
+  // 回归点：旧实现把"数组下标"当列号，行中间的 colspan=2 会把后面的单元格挤到下一行（截图里的错位）
+  assert(slots[4].rowIndex === 2 && slots[4].colStart === 2, '行中间 colspan 之后的单元格仍留在本行第 3 列');
+  assert(slots[8].rowIndex === 4 && slots[8].colStart === 1, 'rowspan 让位：第 5 行第一个单元格从第 2 列开始');
+  assert(slots.every((s) => !s.isEmpty), '该表每行都填满 3 列，无需补位单元');
+
+  // 行尾补齐：2 列表格某行只有 1 个单元格
+  const short = build('<table><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></table>')[0];
+  const shortSlots = buildTableSlots(short.tableRows);
+  assert(
+    shortSlots.length === 4 && shortSlots[3].isEmpty && shortSlots[3].colStart === 1 && shortSlots[3].colSpan === 1,
+    '单元格不足的行补出占位单元（共 ' + shortSlots.length + ' 个槽位）'
+  );
+
+  // 整行为空
+  const emptyRow = build('<table><tr><td>a</td><td>b</td></tr><tr></tr></table>')[0];
+  const erSlots = buildTableSlots(emptyRow.tableRows);
+  assert(erSlots.length === 3 && erSlots[2].isEmpty && erSlots[2].colSpan === 2, '空行补出 1 个跨 2 列的占位单元');
+
+  // rowspan 叠加：真实列数大于任何一行的 colspan 之和（旧算法在此低估列数并丢单元格）
+  const stack = build(
+    '<table><tr><td rowspan="3">A</td></tr><tr><td rowspan="2">B</td><td>C</td></tr><tr><td>D</td><td>E</td></tr></table>'
+  )[0];
+  assert(stack.tableCols === 4, 'rowspan 叠加的真实列数 = 4（实际 ' + stack.tableCols + '）');
+  const stackSlots = buildTableSlots(stack.tableRows);
+  assert(
+    stackSlots.length === 7 && stackSlots[5].rowIndex === 2 && stackSlots[5].colStart === 2 &&
+      stackSlots[6].rowIndex === 2 && stackSlots[6].colStart === 3 && !stackSlots[6].isEmpty,
+    'rowspan 叠加后最后两格落在第 3、4 列（不丢格）'
+  );
+
+  // colspan 撑宽整表，后续行补位
+  const wide = build('<table><tr><td colspan="5">A</td></tr><tr><td>B</td><td>C</td></tr></table>')[0];
+  assert(wide.tableCols === 5, 'colspan 把表撑成 5 列');
+  const wideSlots = buildTableSlots(wide.tableRows);
+  assert(
+    wideSlots.length === 4 && wideSlots[3].isEmpty && wideSlots[3].colStart === 2 && wideSlots[3].colSpan === 3,
+    '第 2 行只给 2 个单元格，尾部补出跨 3 列的占位单元'
+  );
+
+  // colspan 比现有列数大：按浏览器语义把整表撑宽，且单元格完整保留
+  const span9 = build('<table><tr><td>a</td><td>b</td></tr><tr><td colspan="9">c</td></tr></table>')[0];
+  assert(span9.tableCols === 9, 'colspan=9 把整表撑成 9 列（与浏览器一致）');
+  const span9Slot = buildTableSlots(span9.tableRows).filter((s) => s.rowIndex === 1)[0];
+  assert(span9Slot !== undefined && span9Slot.colSpan === 9, '跨 9 列的单元格完整保留，不被截断');
+
+  // 不丢格不变式：稠密展开后非空槽位数应等于原始单元格总数
+  const noLoss = (rows: TableCell[][]): boolean => {
+    const total = rows.reduce((n: number, r: TableCell[]) => n + r.length, 0);
+    const nonEmpty = buildTableSlots(rows).filter((s) => !s.isEmpty).length;
+    return total === nonEmpty && total > 0;
+  };
+  assert(
+    noLoss(tb.tableRows) && noLoss(short.tableRows) && noLoss(stack.tableRows) &&
+      noLoss(wide.tableRows) && noLoss(span9.tableRows),
+    '稠密展开不丢格：非空槽位数 = 原始单元格数'
+  );
+
+  // 表头行识别（表体独立滚动时表头要单独渲染以保持可见）
+  const withHead = build(
+    '<table><thead><tr><th>H1</th><th>H2</th></tr></thead><tbody><tr><td>a</td><td>b</td></tr></tbody></table>'
+  )[0];
+  assert(withHead.tableRows.length === 2 && countHeaderRows(withHead.tableRows) === 1, 'thead 全 th → 表头行数 = 1');
+  const noHead = build('<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>')[0];
+  assert(countHeaderRows(noHead.tableRows) === 0, '无 th 的表格不识别表头（不拆表头）');
+  const mixed = build('<table><tr><th>H</th><td>d</td></tr><tr><td>a</td><td>b</td></tr></table>')[0];
+  assert(countHeaderRows(mixed.tableRows) === 0, 'th/td 混排的行不算表头行');
+}
+
+console.log('\n[19] 解析与图片容错（自定义标签 / 空 src 图片）');
+{
+  // 19a 含连字符的自定义标签：旧正则 ^[a-zA-Z][a-zA-Z0-9]* 遇 '-' 截断，
+  // <my-widget> 被当 <my> 打开、闭合标签永不匹配 → 吞掉后续全部内容（内容丢失级缺陷）
+  const w = HtmlParser.parse('<my-widget>内部</my-widget><p>后续段落</p>');
+  assert(w.children.length === 2, '连字符标签正常闭合，后续内容不被吞掉: ' + String(w.children.length));
+  assert(w.children[0].tag === 'my-widget', '标签名完整保留连字符: ' + w.children[0].tag);
+  assert(w.children[0].children[0].text === '内部', '标签内容正确');
+  assert(w.children[1].tag === 'p' && w.children[1].children[0].text === '后续段落', '后续段落仍是独立节点');
+
+  const ns = HtmlParser.parse('<o:p>甲</o:p><p>乙</p>');
+  assert(ns.children[0].tag === 'o:p', '命名空间标签名完整保留冒号: ' + ns.children[0].tag);
+  assert(ns.children.length === 2, '命名空间标签正常闭合');
+
+  const dotted = HtmlParser.parse('<el-table-column>x</el-table-column><p>y</p>');
+  assert(dotted.children[0].tag === 'el-table-column' && dotted.children.length === 2,
+    '组件库风格标签（多连字符）也正常');
+
+  // 端到端：构建层同样不能丢内容
+  const customBlocks = build('<my-widget>内部</my-widget><p>后续段落</p>');
+  assert(customBlocks.length === 2, '连字符标签后的段落生成独立块');
+  assert(textOf(customBlocks) === '内部后续段落', '两个块文字都完整: ' + textOf(customBlocks));
+
+  // 19b 空 src 的行内图片必须丢弃（协议白名单拦截后 src 为空，不能渲染成空占位框）
+  const emptySrc = build('<p>前<img src="">后</p>');
+  assert(emptySrc[0].groups.every((g: InlineGroup) => g.kind !== 'image'), '空 src 行内图片被丢弃');
+  assert(textOf(emptySrc) === '前后', '丢弃图片不影响前后文字: ' + textOf(emptySrc));
+
+  const noSrc = build('<p><img alt="x">文字</p>');
+  assert(noSrc[0].groups.every((g: InlineGroup) => g.kind !== 'image'), '缺 src 属性的图片被丢弃');
+
+  const blocked = build('<p><img src="javascript:alert(1)">文字</p>');
+  assert(blocked[0].groups.every((g: InlineGroup) => g.kind !== 'image'), '协议被拦截的图片被丢弃');
+  assert(textOf(blocked) === '文字', '被拦截图片不影响后续文字');
+
+  const okImg = build('<p><img src="https://x.com/a.png"></p>');
+  assert(okImg[0].groups.some((g: InlineGroup) => g.kind === 'image' && g.src === 'https://x.com/a.png'),
+    '正常图片仍然保留');
+
+  // 块级图片的空 src 守卫（既有行为，防回退）
+  const blockImg = build('<img src="">');
+  assert(blockImg.length === 0, '块级空 src 图片同样丢弃');
 }
 
 console.log(`\n========================================`);

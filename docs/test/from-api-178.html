@@ -1,0 +1,66 @@
+<h2>问题背景</h2><p>uni‑app 项目，后端返回标准 HTML 富文本，大量使用 <code>&lt;p&gt;</code> 标签做段落分隔。<br>微信小程序端一切正常；<strong>百度小程序端出现异常：段落丢失、文本堆在一起，甚至页面直接报错白屏</strong>。</p><p>报错堆栈：</p><pre><code >TypeError: (this.tagStyle[node.name] || "").split is not a function
+</code></pre><p>原始后端返回 HTML 示例：</p><pre><code >&lt;p&gt;装修监理主要负责装修哪方面&lt;/p&gt;
+&lt;p&gt;1、帮忙审核报价预算，确保无坑，不漏项，无恶意增项；&lt;/p&gt;
+&lt;p&gt;2、检查所需装修的材料的品牌和等级以及全部清单；&lt;/p&gt;
+&lt;p&gt;3、对进场材料进行验收，检查进场材料是否存在瑕疵或者劣质；装修监理主要负责装修的哪方面&lt;/p&gt;
+&lt;p&gt;4、对施工各个环节进行把关，检查，确保施工质量符合国家标准，未达标施工，协助业主与施工方沟通并做整改；&lt;/p&gt;
+</code></pre><h2>坑一：<code>tag‑style</code> 报 split is not a function</h2><h3>错误写法（网上部分错误示例会误导）</h3><pre><code >&lt;!-- ❌错误：tag‑style 中不要写 true/false布尔值 --&gt;
+&lt;mp-html :content="htmlStr" :tag-style="{ div: true }" /&gt;
+</code></pre><h4>根因分析</h4><p><code>tag‑style</code> 的设计：key 是 HTML 标签名，<strong>value 必须是 CSS 字符串，不是布尔开关</strong>GitHub。<br>组件内部源码会执行类似逻辑：</p><pre><code >(this.tagStyle[node.name] || "").split(';')
+</code></pre><p>如果你传入 <code>div:true</code>，值是布尔，布尔类型没有 <code>.split()</code> 方法，直接抛出类型错误，页面白屏崩溃。</p><blockquote>很多人误以为 tag‑style 是 “开启该标签” 的开关，这是完全错误理解。它的作用：给对应标签注入默认内联 CSS 样式。</blockquote><p>✅ 正确用法：</p><pre><code >&lt;!-- 给div设置默认样式，值是css字符串 --&gt;
+&lt;mp-html 
+  :content="htmlStr"
+  :tag-style="{ div: 'margin-bottom:12rpx;line-height:1.7' }"
+/&gt;
+
+&lt;!-- 不需要全局标签样式，直接删掉 tag‑style 属性即可 --&gt;
+&lt;mp-html :content="htmlStr" /&gt;
+</code></pre><h2>坑二：百度小程序 <code>&lt;p&gt;</code> 标签渲染异常（微信正常，百度乱）</h2><h3>现象</h3><p>同样一份 HTML，微信小程序段落换行正常；百度小程序：</p><ol><li>多个连续 <code>&lt;p&gt;</code>，段落合并，丢失换行；</li><li>部分段落直接消失；</li><li>文本堆叠在一起，排版完全错乱。</li></ol><h3>根因</h3><p>百度小程序底层解析引擎对 <code>&lt;p&gt;</code> 标签兼容性缺陷，即使 mp‑html 组件做了兼容，实际业务中依然频繁踩坑。<code><strong>百度小程序建议尽量规避大量&lt;p&gt;标签，优先使用&lt;div&gt;实现段落</strong></code>。</p><h3>解决方案：JS 预处理 HTML 字符串</h3><p>把所有<code>&lt;p&gt;</code>替换为带段落边距的<code>&lt;div&gt;</code>，同时清除 HTML 内部换行符<code>\n \r</code>（百度小程序解析器容易被隐形换行干扰）。</p><p>完整预处理工具函数：</p><pre><code >/**
+ * 百度小程序富文本兼容处理
+ * 将p标签转为div，清除换行符，规避百度小程序p标签渲染bug
+ * @param {String} htmlStr 原始富文本
+ * @returns {String} 处理后html
+ */
+export function fixBaiduRichHtml(htmlStr) {
+  if (!htmlStr) return ''
+  let result = htmlStr
+  // p标签替换为带段落样式div
+  result = result.replace(/&lt;p&gt;/g, '&lt;div style="margin-bottom:12rpx;line-height:1.7;"&gt;')
+  result = result.replace(/&lt;\/p&gt;/g, '&lt;/div&gt;')
+  // 删除换行回车隐形字符
+  result = result.replace(/[\n\r]/g, '')
+  return result
+}
+</code></pre><h3>Vue 页面完整使用示例</h3><pre><code >&lt;template&gt;
+  &lt;view class="article"&gt;
+    &lt;!-- v‑if：等待html不为空再渲染，避免空内容解析异常 --&gt;
+    &lt;mp-html v-if="fixedHtml" :content="fixedHtml" :selectable="false" /&gt;
+  &lt;/view&gt;
+&lt;/template&gt;
+
+&lt;script&gt;
+import { fixBaiduRichHtml } from '@/utils/html‑fix.js'
+export default {
+  data() {
+    return {
+      rawHtml: '',
+      fixedHtml: ''
+    }
+  },
+  onLoad() {
+    // 模拟接口请求
+    this.getArticle()
+  },
+  methods: {
+    async getArticle() {
+      // 接口拿到原始富文本
+      const res = await api.getContent()
+      this.rawHtml = res.content || ''
+      // 做兼容预处理
+      this.fixedHtml = fixBaiduRichHtml(this.rawHtml)
+    }
+  }
+}
+&lt;/script&gt;
+</code></pre><h2>其他配套避坑清单（百度小程序 mp‑html）</h2><ol><li><strong>content 必须保证字符串类型</strong>，接口返回<code>null/undefined</code>要兜底为空字符串，不能直接传非字符串；</li></ol><pre><code >this.rawHtml = res.content || ''
+</code></pre><ol><li>编译问题：修改代码后，清除百度小程序开发者工具缓存，重新执行 <code>yarn dev:mp‑baidu</code>；</li><li>不要依赖富文本内 class 类样式；百度小程序富文本内 class 经常失效，优先使用<strong>行内 style 样式</strong>；</li><li><code>tag‑style</code>只接收<code>标签名:css字符串</code>，禁止<code>true / false / number</code>；</li><li>条件渲染，增加<code>v‑if="fixedHtml"</code>，防止 content 为空时组件做异常解析。</li></ol><h2>总结</h2><ol><li><code>split is not a function</code> → <code><strong>tag‑style传了布尔值，value 必须是 css 字符串，不要当开关使用</strong></code>；</li><li>百度小程序 <code>&lt;p&gt;</code> 标签渲染错乱 → <strong>预处理替换为带样式 div，微信端不受影响，可以全端通用该预处理函数</strong>；</li><li>富文本优先行内 style，减少 class，避免跨平台样式不一致。</li></ol><p><br></p>

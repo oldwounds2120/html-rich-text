@@ -74,6 +74,66 @@ function greet(user: User): string {
   <tr><td><strong>本组件</strong></td><td>ArkUI 原生</td><td>好且完全可控</td></tr>
 </table>
 
+<h3>表格（支持 colspan / rowspan 合并）</h3>
+<table>
+  <tr><th colspan="3">2026 上半年各平台渲染能力对比</th></tr>
+  <tr><th>平台</th><th>样式可控性</th><th>备注</th></tr>
+  <tr>
+    <td rowspan="2">WebView</td>
+    <td>完全可控</td>
+    <td>依赖前端实现</td>
+  </tr>
+  <tr>
+    <td>受 WebView 版本影响</td>
+    <td>首屏较慢</td>
+  </tr>
+  <tr>
+    <td>系统 RichText</td>
+    <td>受限</td>
+    <td>自定义样式难落地</td>
+  </tr>
+  <tr>
+    <td><strong>本组件</strong></td>
+    <td colspan="2">ArkUI 原生渲染，样式与解析层完全开放</td>
+  </tr>
+</table>
+
+<h3>表格（宽表：列多时在本区域内独立横向滚动）</h3>
+<table>
+  <tr><th>编号</th><th>标签</th><th>类型</th><th>是否支持</th><th>实现方式</th><th>备注</th></tr>
+  <tr><td>1</td><td>p</td><td>块级</td><td>是</td><td>Text + Span</td><td>段落间距可配</td></tr>
+  <tr><td>2</td><td>blockquote</td><td>块级</td><td>是</td><td>Row 左边框</td><td>背景色内联优先</td></tr>
+  <tr><td>3</td><td>pre</td><td>块级</td><td>是</td><td>Scroll 横向滚动</td><td>带轻量高亮</td></tr>
+  <tr><td>4</td><td>table</td><td>块级</td><td>是</td><td>Grid + 槽位矩阵</td><td>支持合并单元格</td></tr>
+</table>
+
+<h3>表格（长表：滚动时表头固定）</h3>
+<table>
+  <tr><th>序号</th><th>检查项</th><th>结果</th></tr>
+  <tr><td>1</td><td>解析器容错</td><td>通过</td></tr>
+  <tr><td>2</td><td>内联样式优先级</td><td>通过</td></tr>
+  <tr><td>3</td><td>背景色落点</td><td>通过</td></tr>
+  <tr><td>4</td><td>跨列合并定位</td><td>通过</td></tr>
+  <tr><td>5</td><td>跨行合并占位</td><td>通过</td></tr>
+  <tr><td>6</td><td>行尾补位空单元</td><td>通过</td></tr>
+  <tr><td>7</td><td>列数统计（含 rowspan 堆叠）</td><td>通过</td></tr>
+  <tr><td>8</td><td>表头行识别</td><td>通过</td></tr>
+  <tr><td>9</td><td>斑马纹</td><td>通过</td></tr>
+  <tr><td>10</td><td>单元格内联样式</td><td>通过</td></tr>
+  <tr><td>11</td><td>宽表横向滚动</td><td>通过</td></tr>
+  <tr><td>12</td><td>表头固定</td><td>通过</td></tr>
+  <tr><td>13</td><td>嵌套列表</td><td>通过</td></tr>
+  <tr><td>14</td><td>代码块高亮</td><td>通过</td></tr>
+  <tr><td>15</td><td>图片自适应</td><td>通过</td></tr>
+  <tr><td>16</td><td>链接点击</td><td>通过</td></tr>
+  <tr><td>17</td><td>实体解码</td><td>通过</td></tr>
+  <tr><td>18</td><td>未闭合标签补全</td><td>通过</td></tr>
+  <tr><td>19</td><td>script/style 跳过</td><td>通过</td></tr>
+  <tr><td>20</td><td>空标签兜底</td><td>通过</td></tr>
+  <tr><td>21</td><td>长表滚动性能</td><td>通过</td></tr>
+  <tr><td>22</td><td>表头常驻可见</td><td>通过</td></tr>
+</table>
+
 <hr />
 <p style="text-align:center;color:#999;font-size:13px;">— 全文完 —</p>
 `;
@@ -84,6 +144,13 @@ struct RichTextDemoPage {
   @State html: string = DEMO_HTML
   private config: RichTextConfig = new RichTextConfig()
   private context = getContext(this) as common.UIAbilityContext
+
+  aboutToAppear(): void {
+    // 表格：列多时表格区域独立横向滚动；长表限高 + 表头固定
+    this.config.tableMinColumnWidth = 80   // 列数 × 80vp 超出可用宽度 → 表格内横向滚动
+    this.config.tableMaxHeight = 400       // 表格最高 400vp，超出由表体内部纵向滚动
+    this.config.tableStickyHeader = true   // 滚动时表头常驻可见
+  }
 
   private onLinkClick(url: string): void {
     console.info(`[RichTextDemo] 链接点击: ${url}`);

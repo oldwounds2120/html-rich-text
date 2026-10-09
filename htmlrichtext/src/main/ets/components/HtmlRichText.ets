@@ -28,6 +28,7 @@ import {
 import { RichTextConfig } from '../core/RichTextConfig';
 import { HtmlParser } from '../core/HtmlParser';
 import { RichTextBuilder } from '../core/RichTextBuilder';
+import { TableSlot, buildTableSlots, countHeaderRows } from '../core/TableLayout';
 import { ImagePreviewDialog } from './ImagePreviewDialog';
 
 function toArkAlign(a: AlignStyle): TextAlign {
@@ -314,8 +315,22 @@ export struct HtmlRichText {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
+    // 块级背景：铺满整个块（含右侧留白与 padding 区），对齐浏览器语义
+    .backgroundColor(this.blockContainerBackground(block))
     .margin({ top: block.marginTop, bottom: block.marginBottom })
     .padding({ left: block.paddingLeft })
+  }
+
+  /**
+   * 块容器（BlockBuilder 外层 Column）的底色。
+   * quote / code 由内部容器自带底色与圆角，此处必须保持透明，
+   * 否则外层会再铺一层直角色块、把圆角糊掉。
+   */
+  private blockContainerBackground(block: RenderBlock): string {
+    if (block.kind === 'quote' || block.kind === 'code') {
+      return '#00000000';
+    }
+    return block.backgroundColor ?? '#00000000';
   }
 
   // ---------- 文本段 ----------
@@ -396,7 +411,10 @@ export struct HtmlRichText {
         .fontStyle(toArkFontStyle(sp.fontStyle))
         .decoration({ type: toArkDeco(sp.decoration), color: sp.decorationColor })
         .fontColor(sp.color ?? this.config.bodyColor)
-        .backgroundColor(sp.backgroundColor ?? '#00000000')
+        // Span 只是 Text 的子元素，不支持 backgroundColor（从 CommonMethod 继承来的方法
+        // 在 Span 上会被静默忽略，编译通过但真机不渲染）。行内底色必须用
+        // textBackgroundStyle（API 11+），它只接受 { color, radius }。
+        .textBackgroundStyle({ color: sp.backgroundColor ?? '#00000000' })
         .fontFamily(sp.fontFamily ?? this.config.bodyFontFamily)
         .baselineOffset(LengthMetrics.vp(sp.baselineOffset ?? 0))
         .letterSpacing(sp.letterSpacing ?? 0)
@@ -532,7 +550,8 @@ export struct HtmlRichText {
       .align(Alignment.Start)
     }
     .width('100%')
-    .backgroundColor(this.config.codeBlockBackground)
+    // 底色：内联优先（构建层已算进 block.backgroundColor），config 兜底
+    .backgroundColor(block.backgroundColor ?? this.config.codeBlockBackground)
     .borderRadius(this.config.codeBlockRadius)
   }
 
@@ -572,7 +591,8 @@ export struct HtmlRichText {
       .margin({ left: 10 })
     }
     .width('100%')
-    .backgroundColor(this.config.quoteBackground)
+    // 底色：内联优先（构建层已算进 block.backgroundColor），config 兜底
+    .backgroundColor(block.backgroundColor ?? this.config.quoteBackground)
     .borderRadius(6)
     .padding(this.config.quotePadding)
     // 左侧竖线改用边框实现：贴满实际高度、不参与高度计算。
@@ -635,21 +655,31 @@ export struct HtmlRichText {
 /**
  * TableBlockView - 表格渲染独立组件（HtmlRichText 委托调用）
  *
- * 解决三个实测问题（详见 docs/表格行高与边框问题及修改建议-20260807.md）：
- *  1. 行内不等高：同一行某单元格换行变高时，矮单元格背景铺不满整行、露出边框底色。
- *     方案：通过 rowSpan===1 单元格的 onAreaChange 上报高度，每行取最大值作为该行行高；
- *     全部行测出后写入 @State rowMinHeights，给 GridItem 与内层 Column 同时加
- *     constraintSize({ minHeight })，让 Grid 采纳行高、矮单元格被撑满、背景铺满。
- *     - minHeight 必须同时作用到 GridItem 上（仅内层 Column 不足以让 Grid 采纳行高）；
- *     - rowSpan>1 的跨行单元格不参与测量，避免污染单行行高；
- *     - 值无变化时不重新赋值 @State，避免 onAreaChange→重渲染→再 onAreaChange 循环。
- *  2. 不用 rowsTemplate 固定行列模式（实测只渲染第一行），始终只用 columnsTemplate。
- *  3. 最后一行无下边框：rowsGap 只产生行间缝隙，Grid 底部补 1vp 同色横线。
+ * 布局：先用 core/TableLayout 把表格摊平成"稠密网格槽位"（含补位空单元），
+ * 再按顺序流式填充 Grid，跨行/跨列槽位通过 GridLayoutOptions 声明 irregularSize，
+ * 由 Grid 自行占据多行多列。
+ * **不再使用** columnStart/columnEnd/rowStart/rowEnd 绝对定位 ——
+ * ArkUI 只在同时设置 columnsTemplate 与 rowsTemplate 时才支持它们；
+ * 只设 columnsTemplate 时 rowStart/rowEnd 完全无效、列号冲突会"直接换行"，
+ * 真机表现为整表错位（行尾单元格被挤到下一行、跨行失效、列宽忽宽忽窄）。
+ *
+ * 行高：rowSpan===1 的槽位通过 onAreaChange 上报高度，每行取最大值写入 rowMinHeights，
+ * 给该行所有 GridItem 与内层 Column 同时加 constraintSize({ minHeight })，
+ * 让矮单元格被撑满、背景铺满整行。
+ *  - minHeight 必须同时作用到 GridItem 上（仅内层 Column 不足以让 Grid 采纳行高）；
+ *  - rowSpan>1 的跨行槽位不参与测量，其 minHeight 取所跨各行之和；
+ *  - 值无变化时不重新赋值 @State，避免 onAreaChange→重渲染→再 onAreaChange 循环。
+ *
+ * 表头与表体拆成两个 Grid（表头行 = 从第 0 行起、单元格全为 th 的连续行）：
+ * 这样 tableMaxHeight > 0 时表体可在表格内部独立纵向滚动，而表头保持可见；
+ * 两个 Grid 共用同一 columnsTemplate 与同一容器宽度，列宽天然对齐。
+ *
+ * 横向滚动：tableMinColumnWidth > 0 时内容最小宽度 = 列数 × 该值，
+ * 超出可用宽度即由外层横向 Scroll 承接（表头与表体一起横向滚动）。
  *
  * 注意事项：
  *  - 独立 @Component 才能持有每行测量状态（@Builder 方法无法持有实例状态）；
- *  - 未测出行高（如全表 rowSpan>1 / 测量失败）时 rowMinHeights 保持 0 = 自然行高，
- *    安全降级为原始行为，不会丢行。
+ *  - 未测出行高时 rowMinHeights 保持 0 = 自然行高，安全降级为原始行为，不会丢行。
  */
 @Component
 struct TableBlockView {
@@ -658,124 +688,276 @@ struct TableBlockView {
 
   /** 每行已测高度（普通成员，非响应式，避免每次 onAreaChange 触发渲染） */
   private measured: number[] = []
+  /** 该行是否存在可测量槽位（rowSpan===1）；全部可测行都测出后才应用行高 */
+  private measurable: boolean[] = []
+  private measurableCount: number = 0
+  private reportedCount: number = 0
   /** 每行最小行高（@State 驱动渲染） */
   @State private rowMinHeights: number[] = []
 
-  private gridTemplate(cols: number): string {
-    let t: string = '';
-    for (let i = 0; i < cols; i++) {
-      t += (i === 0 ? '1fr' : ' 1fr');
+  /** 稠密网格槽位（行优先），按表头/表体切分 */
+  private headerSlots: TableSlot[] = []
+  private bodySlots: TableSlot[] = []
+  private headerOptions: GridLayoutOptions = { regularSize: [1, 1] }
+  private bodyOptions: GridLayoutOptions = { regularSize: [1, 1] }
+  private columnsTemplate: string = '1fr'
+  /** 内容最小宽度(vp)：列多时撑开横向滚动；0 = 不限 */
+  private contentMinWidth: number = 0
+  /** 表体是否在表格内部独立纵向滚动（表头固定） */
+  private bodyScrollable: boolean = false
+  /** 表格可用宽度（由外层 onAreaChange 量出；0 = 尚未测量） */
+  @State private availableWidth: number = 0
+  /** 内容最小宽度是否超出可用宽度 —— 超出才套一层横向滚动容器 */
+  @State private hScroll: boolean = false
+
+  aboutToAppear(): void {
+    const cols: number = this.block.tableCols
+    const slots: TableSlot[] = buildTableSlots(this.block.tableRows)
+    this.columnsTemplate = this.gridTemplate(cols)
+    this.contentMinWidth = this.config.tableMinColumnWidth > 0 ? cols * this.config.tableMinColumnWidth : 0
+
+    const rowCount: number = this.block.tableRows.length
+    for (let i = 0; i < rowCount; i++) {
+      this.measured.push(0)
+      this.measurable.push(false)
     }
-    return t;
+    for (const s of slots) {
+      if (s.rowSpan === 1 && !this.measurable[s.rowIndex]) {
+        this.measurable[s.rowIndex] = true
+        this.measurableCount++
+      }
+    }
+
+    // 表头固定只在表体独立滚动时才有意义；表头覆盖全表则退回单表渲染
+    const sticky: boolean = this.config.tableStickyHeader && this.config.tableMaxHeight > 0
+    let headerEnd: number = sticky ? countHeaderRows(this.block.tableRows) : 0
+    if (headerEnd >= rowCount) {
+      headerEnd = 0
+    }
+    this.headerSlots = headerEnd > 0 ? slots.filter((s: TableSlot): boolean => s.rowIndex < headerEnd) : []
+    this.bodySlots = slots.filter((s: TableSlot): boolean => s.rowIndex >= headerEnd)
+    this.headerOptions = this.makeOptions(this.headerSlots)
+    this.bodyOptions = this.makeOptions(this.bodySlots)
+    this.bodyScrollable = this.config.tableMaxHeight > 0 && this.bodySlots.length > 0
+  }
+
+  private gridTemplate(cols: number): string {
+    let t: string = ''
+    for (let i = 0; i < cols; i++) {
+      t += (i === 0 ? '1fr' : ' 1fr')
+    }
+    return t.length > 0 ? t : '1fr'
+  }
+
+  /**
+   * 跨行/跨列声明：regularSize 固定 [1,1]，
+   * irregularIndexes + onGetIrregularSizeByIndex 给出占用的行数与列数。
+   * 索引是该槽位在**所属 Grid 内**的顺序号（表头、表体各算各的）。
+   */
+  private makeOptions(slots: TableSlot[]): GridLayoutOptions {
+    const irregular: number[] = []
+    for (let i = 0; i < slots.length; i++) {
+      const s: TableSlot = slots[i]
+      if (s.colSpan > 1 || s.rowSpan > 1) {
+        irregular.push(i)
+      }
+    }
+    const options: GridLayoutOptions = {
+      regularSize: [1, 1],
+      irregularIndexes: irregular,
+      onGetIrregularSizeByIndex: (index: number): [number, number] => {
+        const s: TableSlot | undefined = slots[index]
+        return s !== undefined ? [s.rowSpan, s.colSpan] : [1, 1]
+      }
+    }
+    return options
+  }
+
+  private hasContent(slot: TableSlot): boolean {
+    return !slot.isEmpty && slot.cell !== undefined
   }
 
   /** 单元格内容 → Span 列表（图片在单元格内降级为 alt/[图片] 文本） */
   private cellSpans(cell: TableCell): RichSpan[] {
-    const out: RichSpan[] = [];
+    const out: RichSpan[] = []
     for (const g of cell.groups) {
       if (g.kind === 'text' || g.kind === 'link') {
         for (const sp of g.spans) {
-          out.push(sp);
+          out.push(sp)
         }
       } else if (g.kind === 'image') {
-        const sp: RichSpan = new RichSpan();
-        sp.text = g.alt.length > 0 ? g.alt : '[图片]';
-        out.push(sp);
+        const sp: RichSpan = new RichSpan()
+        sp.text = g.alt.length > 0 ? g.alt : '[图片]'
+        out.push(sp)
       }
     }
-    return out;
+    return out
+  }
+
+  private slotSpans(slot: TableSlot): RichSpan[] {
+    return slot.cell !== undefined ? this.cellSpans(slot.cell) : []
+  }
+
+  /** 单元格内文字对齐（td/th 的 align 属性） */
+  private slotTextAlign(slot: TableSlot): TextAlign {
+    return slot.cell !== undefined ? toArkAlign(slot.cell.align) : TextAlign.Start
+  }
+
+  private slotIsHeader(slot: TableSlot): boolean {
+    return slot.cell !== undefined && slot.cell.isHeader
+  }
+
+  /** 槽位最小高度：跨行槽位取所跨各行最小行高之和 */
+  private slotMinHeight(slot: TableSlot): number {
+    if (slot.rowSpan <= 1) {
+      return this.rowMinHeights[slot.rowIndex] ?? 0
+    }
+    let sum: number = 0
+    for (let r = slot.rowIndex; r < slot.rowIndex + slot.rowSpan; r++) {
+      sum += this.rowMinHeights[r] ?? 0
+    }
+    return sum
   }
 
   /**
-   * 行高测量上报：rowSpan===1 的 GridItem 上报自身高度，每行取最大值；
-   * 全部行都测出（>0）后才写入 rowMinHeights（提前应用会得到偏小的行高）。
+   * 槽位背景（优先级从高到低）：
+   *  1. 单元格自身的 background-color（td/th 内联样式）
+   *  2. 表头底色
+   *  3. 数据行斑马纹（tableEvenRowBackground / tableOddRowBackground）
+   *  补位空单元没有 cell，直接走斑马纹规则。
+   */
+  private slotBackground(slot: TableSlot): string {
+    const cell: TableCell | undefined = slot.cell
+    if (cell !== undefined && cell.backgroundColor !== undefined) {
+      return cell.backgroundColor
+    }
+    if (cell !== undefined && cell.isHeader) {
+      return this.config.tableHeaderBackground
+    }
+    return slot.rowIndex % 2 === 0 ? this.config.tableEvenRowBackground : this.config.tableOddRowBackground
+  }
+
+  /**
+   * 行高测量上报：rowSpan===1 的槽位上报自身高度，每行取最大值；
+   * 全部可测行都上报后才写入 rowMinHeights（提前应用会得到偏小的行高）。
    */
   private onRowMeasured(rowIndex: number, height: number): void {
-    if (height <= 0) {
-      return;
+    if (height <= 0 || !this.measurable[rowIndex]) {
+      return
     }
-    if (height <= this.measured[rowIndex]) {
-      return;
+    const prev: number = this.measured[rowIndex]
+    if (height <= prev) {
+      return
     }
-    this.measured[rowIndex] = height;
-    // 全部行都测出才应用；未测出保持 0 = 自然行高（安全降级）
-    for (const h of this.measured) {
-      if (h <= 0) {
-        return;
-      }
+    this.measured[rowIndex] = height
+    if (prev <= 0) {
+      this.reportedCount++
     }
-    const mins: number[] = [];
-    let changed: boolean = false;
+    // 全部可测行都测出才应用；未测出保持 0 = 自然行高（安全降级）
+    if (this.reportedCount < this.measurableCount) {
+      return
+    }
+    const mins: number[] = []
+    let changed: boolean = false
     for (let i = 0; i < this.measured.length; i++) {
-      const v: number = Math.max(this.measured[i], this.config.tableMinRowHeight);
+      const v: number = Math.max(this.measured[i], this.config.tableMinRowHeight)
       if (v !== this.rowMinHeights[i]) {
-        changed = true;
+        changed = true
       }
-      mins.push(v);
+      mins.push(v)
     }
     if (changed) {
-      this.rowMinHeights = mins; // 值无变化不赋值，防循环渲染
+      this.rowMinHeights = mins // 值无变化不赋值，防循环渲染
     }
   }
 
-  /** 单元格背景：表头用表头背景，数据行按行号做斑马纹 */
-  private cellBackground(cell: TableCell, rowIndex: number): string {
-    if (cell.isHeader) {
-      return this.config.tableHeaderBackground;
-    }
-    return rowIndex % 2 === 0 ? this.config.tableEvenRowBackground : this.config.tableOddRowBackground;
-  }
-
-  build() {
-    Column() {
-      Grid() {
-        ForEach(this.block.tableRows, (row: TableCell[], rowIndex: number) => {
-          ForEach(row, (cell: TableCell, colIndex: number) => {
-            GridItem() {
-              Column() {
-                Text() {
-                  ForEach(this.cellSpans(cell), (sp: RichSpan) => {
-                    Span(sp.text)
-                      .fontSize(sp.fontSize ?? this.config.bodyFontSize)
-                      .fontWeight(cell.isHeader ? this.config.tableHeaderTextWeight : (sp.fontWeight ?? 400))
-                      .fontStyle(toArkFontStyle(sp.fontStyle))
-                      .decoration({ type: toArkDeco(sp.decoration), color: sp.decorationColor })
-                      .fontColor(cell.isHeader ? this.config.tableHeaderTextColor : (sp.color ?? this.config.tableTextColor))
-                      .backgroundColor(sp.backgroundColor ?? '#00000000')
-                  }, (sp: RichSpan, index: number) => 's' + index.toString())
-                }
-                .lineHeight(this.config.bodyFontSize * 1.5)
-                .width('100%')
-              }
-              // 内层 Column 同值 minHeight：背景铺满整行、内容顶对齐（未测出时 ??0 = 自然行高）
-              .constraintSize({ minHeight: this.rowMinHeights[rowIndex] ?? 0 })
-              .justifyContent(FlexAlign.Start)
-              .padding(this.config.tableCellPadding)
-              .backgroundColor(this.cellBackground(cell, rowIndex))
-              .alignItems(HorizontalAlign.Start)
-            }
-            // 关键：GridItem 也加 minHeight，Grid 才采纳该行行高，行内矮单元格被撑满
-            .constraintSize({ minHeight: this.rowMinHeights[rowIndex] ?? 0 })
-            .columnStart(colIndex)
-            .columnEnd(colIndex + cell.colSpan - 1)
-            .rowStart(rowIndex)
-            .rowEnd(rowIndex + cell.rowSpan - 1)
-            .onAreaChange((_oldV: Area, newV: Area) => {
-              if (cell.rowSpan === 1) {
-                const h: number = Number(newV.height);
-                if (!Number.isNaN(h) && h > 0) {
-                  this.onRowMeasured(rowIndex, h);
-                }
-              }
-            })
-          }, (cell: TableCell, colIndex: number) => rowIndex.toString() + '-' + colIndex.toString())
-        }, (row: TableCell[], rowIndex: number) => rowIndex.toString())
+  /** 单个网格单元（含补位空单元） */
+  @Builder
+  private CellView(slot: TableSlot) {
+    GridItem() {
+      Column() {
+        if (this.hasContent(slot)) {
+          Text() {
+            ForEach(this.slotSpans(slot), (sp: RichSpan) => {
+              Span(sp.text)
+                .fontSize(sp.fontSize ?? this.config.bodyFontSize)
+                .fontWeight(this.slotIsHeader(slot) ? this.config.tableHeaderTextWeight : (sp.fontWeight ?? 400))
+                .fontStyle(toArkFontStyle(sp.fontStyle))
+                .decoration({ type: toArkDeco(sp.decoration), color: sp.decorationColor })
+                .fontColor(this.slotIsHeader(slot) ? this.config.tableHeaderTextColor : (sp.color ?? this.config.tableTextColor))
+                // 同上：Span 的行内底色只能用 textBackgroundStyle
+                .textBackgroundStyle({ color: sp.backgroundColor ?? '#00000000' })
+            }, (sp: RichSpan, index: number) => 's' + index.toString())
+          }
+          .lineHeight(this.config.bodyFontSize * 1.5)
+          .width('100%')
+          .textAlign(this.slotTextAlign(slot))
+        }
       }
-      .columnsTemplate(this.gridTemplate(this.block.tableCols))
-      .rowsGap(1)
-      .columnsGap(1)
-      .backgroundColor(this.config.tableBorderColor)
-      .width('100%')
+      // 内层 Column 同值 minHeight：背景铺满整行、内容顶对齐（未测出时 ??0 = 自然行高）
+      .constraintSize({ minHeight: this.slotMinHeight(slot) })
+      .justifyContent(FlexAlign.Start)
+      .padding(this.config.tableCellPadding)
+      .backgroundColor(this.slotBackground(slot))
+      .alignItems(HorizontalAlign.Start)
+    }
+    // 关键：GridItem 也加 minHeight，Grid 才采纳该行行高，行内矮单元格被撑满
+    .constraintSize({ minHeight: this.slotMinHeight(slot) })
+    .onAreaChange((_oldV: Area, newV: Area) => {
+      if (slot.rowSpan === 1) {
+        const h: number = Number(newV.height)
+        if (!Number.isNaN(h) && h > 0) {
+          this.onRowMeasured(slot.rowIndex, h)
+        }
+      }
+    })
+  }
+
+  /** 一组槽位 = 一个 Grid（表头、表体各一个） */
+  @Builder
+  private SlotGrid(slots: TableSlot[], options: GridLayoutOptions) {
+    Grid(undefined, options) {
+      ForEach(slots, (slot: TableSlot) => {
+        this.CellView(slot)
+      }, (slot: TableSlot) => slot.index.toString())
+    }
+    .columnsTemplate(this.columnsTemplate)
+    .rowsGap(1)
+    .columnsGap(1)
+    .backgroundColor(this.config.tableBorderColor)
+    .width('100%')
+  }
+
+  @Builder
+  private TableContent() {
+    Column() {
+      if (this.headerSlots.length > 0) {
+        this.SlotGrid(this.headerSlots, this.headerOptions)
+        // 表头与表体之间的 1vp 分隔线（与 Grid 的 rowsGap 同色，视觉连续）
+        Row()
+          .width('100%')
+          .height(1)
+          .backgroundColor(this.config.tableBorderColor)
+      }
+      if (this.bodyScrollable) {
+        Scroll() {
+          Column() {
+            this.SlotGrid(this.bodySlots, this.bodyOptions)
+          }
+          .width('100%')
+        }
+        .scrollable(ScrollDirection.Vertical)
+        // 内层先滚，滚到边界再把手势交给页面，否则长表格会"卡住"页面滚动
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
+        .constraintSize({ maxHeight: this.config.tableMaxHeight })
+        .scrollBar(BarState.Auto)
+        .width('100%')
+      } else {
+        this.SlotGrid(this.bodySlots, this.bodyOptions)
+      }
       // 最后一行下边框：rowsGap 只产生行间缝隙，最底部补 1vp 同色横线
       Row()
         .width('100%')
@@ -783,7 +965,35 @@ struct TableBlockView {
         .backgroundColor(this.config.tableBorderColor)
     }
     .width('100%')
+    // 列多时用最小宽度把内容撑开、交给外层横向滚动；窄表不加约束，宽度就是可用宽度
+    .constraintSize({ minWidth: this.hScroll ? this.contentMinWidth : 0 })
+  }
+
+  build() {
+    Column() {
+      if (this.hScroll) {
+        Scroll() {
+          this.TableContent()
+        }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .width('100%')
+      } else {
+        this.TableContent()
+      }
+    }
+    .width('100%')
     .clip(true)
     .borderRadius(4)
+    // 横向滚动只在"内容最小宽度确实超出可用宽度"时启用：先按原样渲染一帧，
+    // 量到可用宽度后再决定是否套横向滚动容器 ——
+    // 避免给每一张窄表都平白套一层滚动层（那会引入不必要的测量风险）。
+    .onAreaChange((_oldV: Area, newV: Area) => {
+      const w: number = Number(newV.width)
+      if (!Number.isNaN(w) && w > 0 && Math.abs(w - this.availableWidth) > 0.5) {
+        this.availableWidth = w
+        this.hScroll = this.contentMinWidth > w
+      }
+    })
   }
 }
